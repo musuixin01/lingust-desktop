@@ -172,12 +172,15 @@ $$\text{Inner Radius} = \text{Outer Radius} - \text{Padding}$$
 
 ## 6. 核心组件标准实现规约 (Component Standards)
 
-### 6.1 悬浮卡片外框 (`FloatingTranslatorCard`)
-- 必须支持全边缘 8 向拉伸把手（`resize-handle`），把手在 Hover 时带有微弱高光；
-- 缩放手柄层级限制为 `z-20` 并位于四角最外沿，顶栏所有按钮及控制胶囊强制定义为 `relative z-30` 并配备 `e.stopPropagation()`，彻底杜绝拉手对按钮点击的拦截；
-- 拖拽运动位移阈值：必须应用 4px 位移判断（`Math.hypot(dx, dy) >= 4`），原位点击绝不触发 `isDragging` 拖拽状态与阻尼微缩，保障点击精准无延迟；
-- 拖拽激活状态下应用 `scale-[1.018]` 阻尼放大，投影从 `shadow-2xl` 渐变为 `shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85)]`，强调景深抬升；
-- 卡片关闭与拖拽判定区必须排除内部 `button`、`input` 与 `.no-drag` 元素，防止误触。
+### 6.1 悬浮卡片外框 (`FloatingTranslatorCard`) 与交互优先级体系
+- **全边缘 8 向拉伸把手与四角优先级**：必须支持全边缘 8 向拉伸把手（`resize-handle`）；四角（NW、NE、SW、SE）缩放手柄层级提升为 `z-50` 并扩大物理触控热区至 24px×24px（`w-6 h-6`），确保左上角与右上角缩放把手绝对优先于标题栏拖拽；
+- **左上与右上工具交互区绝对优先准则**：
+  - 顶栏左上区域（红绿灯、关闭、清空、药丸收起、刷新）与右上区域（截图、固定置顶、字号浮层、偏好设置）必须包裹于 `.top-left-zone` 与 `.top-right-zone` 并设为 `relative z-40`，所有交互按钮自带 `onMouseDown={(e) => e.stopPropagation()}`；
+  - 容器拖拽入口 `handleMouseDown` 实施几何坐标保底保护：左边缘 ≤ 68px 区域与右边缘 ≤ 95~145px 区域严禁启动拖动，即使点击在按钮间距或内边距上也绝不发生容器位移；
+- **拖拽运动位移阈值与微抖动过滤**：
+  - 采用 7px 位移判定阈值（`Math.hypot(dx, dy) >= 7`），原位点击或触控微颤绝不触发 `isDragging` 拖拽状态与阻尼微缩，保障点击精准无位移；
+- **拖拽激活视觉反馈**：拖拽激活状态下应用 `scale-[1.018]` 阻尼放大，投影从 `shadow-2xl` 渐变为 `shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85)]`，强调景深抬升；
+- **极简模式与药丸模式同步防护**：极简模式的左上与右上角感知传感器（Sensor）及展开胶囊、药丸模式左右悬停热区必须统一应用 `.no-drag` 与冒泡切断。
 
 ### 6.2 语音与复制按钮
 - 统一采用圆形微透触控靶标：`p-1 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors`；

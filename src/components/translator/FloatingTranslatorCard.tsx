@@ -333,20 +333,69 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
     return () => window.removeEventListener('resize', handleWindowResize);
   }, [size.width, size.height]);
 
-  // Window drag handlers with 4px drag movement threshold to preserve click handlers
+  // Window drag handlers with strict interaction area precedence
+  // Ensures top-left and top-right controls (close, traffic lights, resize buttons, screenshot, pin, font, settings)
+  // take absolute precedence over the container move event, preventing unintended movement
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only respond to primary mouse button (left-click)
     if (e.button !== 0) return;
 
-    const target = e.target as HTMLElement;
+    // Never initiate drag if already resizing
+    if (isResizing) return;
+
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    // 1. Element-level precedence: Never drag if clicking on interactive controls or utility regions
     if (
       target.closest('button') ||
       target.closest('input') ||
       target.closest('textarea') ||
+      target.closest('select') ||
+      target.closest('[role="button"]') ||
       target.closest('.no-drag') ||
-      target.closest('.resize-handle')
+      target.closest('.resize-handle') ||
+      target.closest('.top-left-zone') ||
+      target.closest('.top-right-zone') ||
+      target.closest('.top-left-sensor') ||
+      target.closest('.top-right-sensor') ||
+      target.closest('.font-popover-container') ||
+      target.closest('[data-no-drag]') ||
+      target.closest('[data-drag-ignore]')
     ) {
       return;
+    }
+
+    // 2. Geometric precedence: Guard top-left and top-right regions of header bar against unintended movement
+    // Ensures clicks on or around utility buttons (close, traffic lights, crop, pin, settings) take absolute precedence
+    const headerEl = target.closest('.card-header-bar') as HTMLElement | null;
+    if (headerEl) {
+      const rect = headerEl.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const rightDistance = rect.right - e.clientX;
+
+      // Top-left utility zone (traffic lights: close, minimize, refresh)
+      if (relativeX <= 68) {
+        return;
+      }
+      // Top-right utility zone (crop, pin, font size popover, settings)
+      const rightProtectionWidth = size.width < 340 ? 95 : 145;
+      if (rightDistance <= rightProtectionWidth) {
+        return;
+      }
+    }
+
+    // Guard minimal mode top-left and top-right interaction areas
+    const minimalEl = target.closest('.card-minimal-container') as HTMLElement | null;
+    if (minimalEl) {
+      const rect = minimalEl.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left;
+      const rightDistance = rect.right - e.clientX;
+      const relativeY = e.clientY - rect.top;
+
+      if (relativeY <= 40 && (relativeX <= 64 || rightDistance <= 64)) {
+        return;
+      }
     }
 
     pendingDragRef.current = {
@@ -360,13 +409,13 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!pendingDragRef.current.active) return;
+      if (!pendingDragRef.current.active || isResizing) return;
       const dx = e.clientX - pendingDragRef.current.mouseX;
       const dy = e.clientY - pendingDragRef.current.mouseY;
 
-      // Check movement threshold (4px) to distinguish simple clicks from dragging
+      // Check movement threshold (7px) to distinguish intentional drags from micro-jitters during clicks
       if (!isDragging) {
-        if (Math.hypot(dx, dy) < 4) return;
+        if (Math.hypot(dx, dy) < 7) return;
         setIsDragging(true);
       }
 
@@ -391,7 +440,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, isMinimized, size]);
+  }, [isDragging, isMinimized, isResizing, size]);
 
   useEffect(() => {
     if (isDragging) {
@@ -411,6 +460,9 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
   ) => {
     e.stopPropagation();
     e.preventDefault();
+    // Cancel any pending drag immediately so resize has absolute priority
+    pendingDragRef.current.active = false;
+    setIsDragging(false);
     setIsResizing(true);
     resizeStartRef.current = {
       direction,
@@ -576,10 +628,14 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
               setIsLeftHovered(false);
             }, 250);
           }}
-          className="relative flex items-center shrink-0 h-full z-20"
+          onMouseDown={(e) => e.stopPropagation()}
+          className="no-drag top-left-zone relative flex items-center shrink-0 h-full z-40"
         >
           {/* 最左侧边缘触发感知热区：仅局限在最左侧边缘16px，决不向右侵占搜索框 */}
-          <div className="absolute left-0 top-0 bottom-0 w-4 cursor-pointer z-10" />
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            className="no-drag absolute left-0 top-0 bottom-0 w-4 cursor-pointer z-10"
+          />
           <div
             className={`flex items-center gap-1.5 overflow-hidden transition-all duration-200 ease-out shrink-0 ${
               isLeftVisible ? 'opacity-100 mr-0.5' : 'opacity-0 -mr-1'
@@ -777,10 +833,14 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
                 setIsRightHovered(false);
               }, 280);
             }}
-            className="no-drag relative flex items-center shrink-0 h-full z-40"
+            onMouseDown={(e) => e.stopPropagation()}
+            className="no-drag top-right-zone relative flex items-center shrink-0 h-full z-40"
           >
             {/* 最右侧边缘触发感知热区：确保鼠标移动到最右侧圆角时也能灵敏触发 */}
-            <div className="absolute -right-2 top-0 bottom-0 w-7 cursor-pointer z-10" />
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              className="no-drag absolute -right-2 top-0 bottom-0 w-7 cursor-pointer z-10"
+            />
 
             {/* 在 flex 流中平滑展开，收缩时宽度为0且完全隐去，绝不额外增加图标，左侧自然让位 */}
             <div
@@ -973,7 +1033,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       {!isMinimal && (
         <div
           onMouseDown={handleMouseDown}
-          className={`relative z-30 w-full max-w-full overflow-hidden ${
+          className={`card-header-bar relative z-30 w-full max-w-full overflow-hidden ${
             isUltraCompact
               ? 'px-2 py-1'
               : isVeryCompact
@@ -983,10 +1043,10 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
             isDragging ? 'cursor-grabbing' : 'cursor-grab'
           } rounded-t-[32px] shrink-0 gap-1`}
         >
-        {/* Traffic Light Dots */}
+        {/* Top-Left Action Zone (Traffic lights & close/minimize/refresh): 优先捕获并阻止向外冒泡，杜绝移动 */}
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className={`no-drag relative z-30 flex items-center shrink-0 ${isUltraCompact ? 'gap-1' : 'gap-1.5'}`}
+          className={`no-drag top-left-zone relative z-40 flex items-center shrink-0 py-0.5 rounded-xl ${isUltraCompact ? 'gap-1' : 'gap-1.5'}`}
         >
           <button
             type="button"
@@ -1014,7 +1074,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         {/* Center: Language Switcher Pill */}
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className="no-drag relative z-30 flex items-center min-w-0 shrink justify-center gap-1"
+          className="no-drag relative z-40 flex items-center min-w-0 shrink justify-center gap-1"
         >
           <LanguageSelector
             sourceLang={sourceLang}
@@ -1052,10 +1112,10 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
           </button>
         </div>
 
-        {/* Right action buttons: Screenshot, Pin & Settings (始终完整展示，紧凑排布) */}
+        {/* Top-Right Action Zone: Screenshot, Pin, Font & Settings (始终完整展示，紧凑排布) */}
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className="no-drag relative z-30 flex items-center shrink-0 gap-0.5 sm:gap-1"
+          className="no-drag top-right-zone relative z-40 flex items-center shrink-0 py-0.5 rounded-xl gap-0.5 sm:gap-1"
         >
           {/* Screenshot Translation Trigger */}
           <button
@@ -1236,13 +1296,14 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         <div
           onMouseDown={handleMouseDown}
           style={{ fontSize: `${baseFontScale * 100}%` }}
-          className="p-2 flex flex-col justify-center h-full w-full space-y-1 overflow-hidden select-text relative"
+          className="card-minimal-container p-2 flex flex-col justify-center h-full w-full space-y-1 overflow-hidden select-text relative"
         >
-          {/* Top-Left Corner Sensor: 严格仅限最左上角极小区域 (36px×28px)，杜绝整个顶部触发 */}
+          {/* Top-Left Corner Sensor: 严格仅限最左上角极小区域 (40px×32px)，优先拦截并阻止移动 */}
           <div
             onMouseEnter={handleMinimalTopLeftEnter}
             onMouseLeave={handleMinimalTopLeftLeave}
-            className="absolute top-0 left-0 w-9 h-7 z-30 pointer-events-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+            className="no-drag top-left-sensor absolute top-0 left-0 w-10 h-8 z-40 pointer-events-auto cursor-default"
           />
 
           {/* Top-Left Hover Capsule: 鼠标移入最左上角后才弹出，绝不干扰顶部其他区域 */}
@@ -1250,7 +1311,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
             onMouseEnter={handleMinimalTopLeftEnter}
             onMouseLeave={handleMinimalTopLeftLeave}
             onMouseDown={(e) => e.stopPropagation()}
-            className={`no-drag absolute top-1 left-2 z-40 flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-950/92 backdrop-blur-md border border-white/20 shadow-xl transition-all duration-200 ${
+            className={`no-drag top-left-zone absolute top-1 left-2 z-50 flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-950/92 backdrop-blur-md border border-white/20 shadow-xl transition-all duration-200 ${
               isMinimalTopLeftHovered
                 ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
                 : 'opacity-0 scale-90 -translate-y-1 pointer-events-none'
@@ -1297,11 +1358,12 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
             </button>
           </div>
 
-          {/* Top-Right Corner Sensor: 严格仅限最右上角极小区域 (36px×28px)，杜绝整个顶部触发 */}
+          {/* Top-Right Corner Sensor: 严格仅限最右上角极小区域 (40px×32px)，优先拦截并阻止移动 */}
           <div
             onMouseEnter={handleMinimalTopRightEnter}
             onMouseLeave={handleMinimalTopRightLeave}
-            className="absolute top-0 right-0 w-9 h-7 z-30 pointer-events-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+            className="no-drag top-right-sensor absolute top-0 right-0 w-10 h-8 z-40 pointer-events-auto cursor-default"
           />
 
           {/* Top-Right Hover Capsule: 鼠标移入最右上角后才弹出常用功能 */}
@@ -1309,7 +1371,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
             onMouseEnter={handleMinimalTopRightEnter}
             onMouseLeave={handleMinimalTopRightLeave}
             onMouseDown={(e) => e.stopPropagation()}
-            className={`no-drag absolute top-1 right-2 z-40 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-950/92 backdrop-blur-md border border-white/20 shadow-xl transition-all duration-200 ${
+            className={`no-drag top-right-zone absolute top-1 right-2 z-50 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-950/92 backdrop-blur-md border border-white/20 shadow-xl transition-all duration-200 ${
               isMinimalTopRightHovered
                 ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
                 : 'opacity-0 scale-90 -translate-y-1 pointer-events-none'
@@ -1763,34 +1825,35 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 
       {/* =========================================================================
           8 方向全角度拉伸与四角缩放手柄（高灵敏拖动调节尺寸）
-          四角的小尖尖均已彻底隐藏，纯净简约玻璃外观，仍支持平滑拉伸手柄交互
+          四角小尖尖隐藏，纯净简约玻璃外观；四角提升至 z-50 且扩大热区至 24×24px，
+          确保调节大小时绝对优先于容器移动事件
           ========================================================================= */}
-      {/* 1. 四个角 (NW, NE, SW, SE) 无视觉尖尖标记，纯净拖拽 */}
+      {/* 1. 四个角 (NW, NE, SW, SE) */}
       {/* 右下角 (SE) */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
-        className="resize-handle absolute -right-1.5 -bottom-1.5 w-5 h-5 cursor-nwse-resize rounded-br-[32px] transition-colors z-20"
+        className="resize-handle pointer-events-auto absolute -right-2 -bottom-2 w-6 h-6 cursor-nwse-resize rounded-br-[32px] transition-colors z-50"
         title="拖动右下角调节大小"
       />
 
       {/* 左下角 (SW) */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
-        className="resize-handle absolute -left-1.5 -bottom-1.5 w-5 h-5 cursor-nesw-resize rounded-bl-[32px] transition-colors z-20"
+        className="resize-handle pointer-events-auto absolute -left-2 -bottom-2 w-6 h-6 cursor-nesw-resize rounded-bl-[32px] transition-colors z-50"
         title="拖动左下角调节大小"
       />
 
-      {/* 右上角 (NE) */}
+      {/* 右上角 (NE) - 提高至 z-50 并扩大热区为 24px×24px，确保优先级高于标题栏拖拽 */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
-        className="resize-handle absolute -right-1.5 -top-1.5 w-4 h-4 cursor-nesw-resize rounded-tr-[32px] transition-colors z-20"
+        className="resize-handle pointer-events-auto absolute -right-2 -top-2 w-6 h-6 cursor-nesw-resize rounded-tr-[32px] transition-colors z-50"
         title="拖动右上角调节大小"
       />
 
-      {/* 左上角 (NW) */}
+      {/* 左上角 (NW) - 提高至 z-50 并扩大热区为 24px×24px，确保优先级高于标题栏拖拽 */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
-        className="resize-handle absolute -left-1.5 -top-1.5 w-4 h-4 cursor-nwse-resize rounded-tl-[32px] transition-colors z-20"
+        className="resize-handle pointer-events-auto absolute -left-2 -top-2 w-6 h-6 cursor-nwse-resize rounded-tl-[32px] transition-colors z-50"
         title="拖动左上角调节大小"
       />
 
@@ -1798,25 +1861,25 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       {/* 右侧边 (E) */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
-        className="resize-handle absolute -right-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-r-full transition-colors z-30"
+        className="resize-handle pointer-events-auto absolute -right-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-r-full transition-colors z-40"
         title="向左右拉伸调节宽度"
       />
       {/* 底部边 (S) */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 's')}
-        className="resize-handle absolute left-8 right-8 -bottom-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-b-full transition-colors z-30"
+        className="resize-handle pointer-events-auto absolute left-8 right-8 -bottom-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-b-full transition-colors z-40"
         title="向上下拉伸调节高度"
       />
       {/* 左侧边 (W) */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
-        className="resize-handle absolute -left-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-l-full transition-colors z-30"
+        className="resize-handle pointer-events-auto absolute -left-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-l-full transition-colors z-40"
         title="向左右拉伸调节宽度"
       />
       {/* 顶部边 (N) */}
       <div
         onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
-        className="resize-handle absolute left-8 right-8 -top-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-t-full transition-colors z-30"
+        className="resize-handle pointer-events-auto absolute left-8 right-8 -top-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-t-full transition-colors z-40"
         title="向上下拉伸调节高度"
       />
     </div>
