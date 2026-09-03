@@ -1,7 +1,7 @@
 import React from 'react';
 import { Languages } from 'lucide-react';
 
-interface SelectionTooltipProps {
+export interface SelectionTooltipProps {
   position: { x: number; y: number } | null;
   onTranslate: () => void;
   isDark?: boolean;

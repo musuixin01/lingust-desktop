@@ -73,7 +73,7 @@ export interface TranslationResult {
 
 export type TranslationEngine = 'gemini' | 'deepl' | 'youdao' | 'offline';
 
-export type FontSizePreference = 'small' | 'medium' | 'large' | 'huge';
+export type FontSizePreference = 'small' | 'medium' | 'large' | 'huge' | 'custom';
 
 export interface EngineApiKeys {
   geminiKey?: string;
@@ -92,5 +92,6 @@ export interface AppSettings {
   themeMode: 'light' | 'dark';
   desktopWallpaper: 'frosted-glass' | 'sonoma-dark' | 'monterey' | 'graphite' | 'minimal-light';
   compactMode: boolean;
-  fontSize: FontSizePreference; // 自定义字体大小
+  fontSize: FontSizePreference; // 自定义字体大小预设
+  customFontSize?: number; // 精确百分比字号 (60% ~ 150%)，支持直接输入调节
 }

@@ -14,7 +14,7 @@ import {
   Zap,
   Crop,
 } from 'lucide-react';
-import { AppSettings } from '../types';
+import { AppSettings } from '../../types';
 
 interface DesktopSimulatorProps {
   settings: AppSettings;

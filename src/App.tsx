@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppSettings, TranslationResult, ScreenshotTranslationResult, InPlaceScreenshotTranslation } from './types';
 import { DEFAULT_SOURCE_LANG, DEFAULT_TARGET_LANG } from './constants/languages';
-import { FloatingTranslatorCard } from './components/FloatingTranslatorCard';
-import { DesktopSimulator } from './components/DesktopSimulator';
-import { SettingsModal } from './components/SettingsModal';
-import { HistoryDrawer } from './components/HistoryDrawer';
-import { SelectionTooltip } from './components/SelectionTooltip';
-import { ScreenSnipper } from './components/ScreenSnipper';
-import { InPlaceScreenshotCard } from './components/InPlaceScreenshotCard';
+import {
+  FloatingTranslatorCard,
+  DesktopSimulator,
+  SettingsModal,
+  HistoryDrawer,
+  SelectionTooltip,
+  ScreenSnipper,
+  InPlaceScreenshotCard,
+} from './components';
 import { speakText } from './utils/speech';
 import { translateOffline } from './utils/offlineEngine';
 
@@ -53,6 +55,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   desktopWallpaper: 'frosted-glass',
   compactMode: false,
   fontSize: 'medium',
+  customFontSize: 92,
 };
 
 export default function App() {
@@ -561,6 +564,7 @@ export default function App() {
         }
         onOpenSnipper={() => setIsSnipperOpen(true)}
         onClearOcr={handleClearOcr}
+        onUpdateSettings={(newSettings) => setSettings((prev) => ({ ...prev, ...newSettings }))}
       />
 
       {/* In-Place Fixed Screenshot Translation Cards (在所截屏位置固定所选大小，支持自由调整尺寸与挪动，呈现中英逐行对照) */}

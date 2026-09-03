@@ -20,7 +20,7 @@ import {
   Cpu,
   Type,
 } from 'lucide-react';
-import { AppSettings, TranslationEngine, EngineApiKeys } from '../types';
+import { AppSettings, TranslationEngine, EngineApiKeys } from '../../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -536,36 +536,90 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Section 5: 界面字体自定义大小 */}
+          {/* Section 5: 界面字体自定义大小 (支持直接数值输入与预设) */}
           <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="font-semibold flex items-center gap-1.5">
                 <Type className="w-3.5 h-3.5 text-blue-500" />
-                <span>悬浮卡片字体大小</span>
+                <span>悬浮卡片字体大小与排版</span>
               </div>
               <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold">
-                {settings.fontSize === 'small'
-                  ? '小号 (85%)'
+                {settings.customFontSize
+                  ? `${settings.customFontSize}%`
+                  : settings.fontSize === 'small'
+                  ? '紧凑 (82%)'
                   : settings.fontSize === 'large'
-                  ? '大号 (115%)'
+                  ? '大号 (108%)'
                   : settings.fontSize === 'huge'
-                  ? '特大 (130%)'
-                  : '标准 (100%)'}
+                  ? '特大 (125%)'
+                  : '默认 (92%)'}
               </span>
             </div>
+
+            {/* Direct Input Field */}
+            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                  支持直接输入字号百分比
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  默认 92% 更精致和谐，支持范围 60% ~ 150%
+                </div>
+              </div>
+              <div className="relative w-24 shrink-0">
+                <input
+                  type="number"
+                  min={60}
+                  max={150}
+                  step={1}
+                  value={
+                    settings.customFontSize ??
+                    (settings.fontSize === 'small'
+                      ? 82
+                      : settings.fontSize === 'large'
+                      ? 108
+                      : settings.fontSize === 'huge'
+                      ? 125
+                      : 92)
+                  }
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      onUpdateSettings({
+                        customFontSize: Math.max(60, Math.min(150, val)),
+                        fontSize: 'custom',
+                      });
+                    }
+                  }}
+                  className="w-full px-2 py-1 text-center font-mono font-semibold text-xs rounded-lg bg-white dark:bg-black/40 border border-slate-300 dark:border-white/20 text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 pr-6"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono pointer-events-none">
+                  %
+                </span>
+              </div>
+            </div>
+
             <div className="grid grid-cols-4 gap-1.5">
               {[
-                { id: 'small', label: '小号', scale: '85%', desc: '紧凑自适应' },
-                { id: 'medium', label: '标准', scale: '100%', desc: '平衡阅读' },
-                { id: 'large', label: '大号', scale: '115%', desc: '舒缓清晰' },
-                { id: 'huge', label: '特大', scale: '130%', desc: '醒目大字' },
+                { id: 'small', percent: 82, label: '小号', scale: '82%', desc: '紧凑自适应' },
+                { id: 'medium', percent: 92, label: '默认', scale: '92%', desc: '精致协调' },
+                { id: 'standard', percent: 100, label: '标准', scale: '100%', desc: '平衡阅读' },
+                { id: 'large', percent: 108, label: '大号', scale: '108%', desc: '舒缓清晰' },
               ].map((f) => (
                 <button
                   key={f.id}
                   type="button"
-                  onClick={() => onUpdateSettings({ fontSize: f.id as any })}
+                  onClick={() =>
+                    onUpdateSettings({
+                      customFontSize: f.percent,
+                      fontSize: f.id === 'medium' ? 'medium' : f.id === 'small' ? 'small' : 'custom',
+                    })
+                  }
                   className={`py-2 px-1.5 rounded-xl border text-center transition-all cursor-pointer ${
-                    (settings.fontSize || 'medium') === f.id
+                    (settings.customFontSize === f.percent ||
+                      (!settings.customFontSize &&
+                        ((f.id === 'medium' && (!settings.fontSize || settings.fontSize === 'medium')) ||
+                          settings.fontSize === f.id)))
                       ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold shadow-xs ring-1 ring-blue-500/20'
                       : 'border-transparent bg-black/5 dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20 text-slate-600 dark:text-slate-300'
                   }`}
@@ -575,6 +629,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="text-[9px] text-slate-400 mt-0.5">{f.desc}</div>
                 </button>
               ))}
+            </div>
+
+            {/* Compact Mode Switch */}
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <span className="text-slate-600 dark:text-slate-400 text-[11px]">
+                动态紧凑排版 (卡片缩小或手动开启时减少行间距与外边距)
+              </span>
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ compactMode: !settings.compactMode })}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                  settings.compactMode
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-black/5 dark:bg-white/5 text-slate-500 border-black/10 dark:border-white/10'
+                }`}
+              >
+                {settings.compactMode ? '已开启' : '跟随卡片尺寸'}
+              </button>
             </div>
           </div>
 

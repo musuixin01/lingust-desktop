@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Search, Star, Trash2, Clock, Volume2, ArrowRight } from 'lucide-react';
-import { TranslationResult } from '../types';
-import { speakText } from '../utils/speech';
+import { TranslationResult } from '../../types';
+import { speakText } from '../../utils/speech';
 
 interface HistoryDrawerProps {
   isOpen: boolean;
@@ -144,11 +144,19 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="font-bold truncate">{item.sourceText}</span>
-                      {item.phonetic?.us && (
-                        <span className="text-[10px] font-mono text-slate-400">
-                          /{item.phonetic.us}/
-                        </span>
-                      )}
+                      {(() => {
+                        const raw =
+                          typeof item.phonetic === 'string'
+                            ? item.phonetic
+                            : item.phonetic?.us || item.phonetic?.uk || item.phonetic?.general;
+                        if (!raw) return null;
+                        const clean = raw.replace(/^\/|\/$/g, '');
+                        return (
+                          <span className="text-[10px] font-mono text-slate-400">
+                            /{clean}/
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="text-blue-600 dark:text-blue-400 text-[11px] truncate mt-0.5">
                       {item.translatedText}

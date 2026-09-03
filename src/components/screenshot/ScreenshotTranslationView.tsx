@@ -12,8 +12,8 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { ScreenshotTranslationResult } from '../types';
-import { speakText } from '../utils/speech';
+import { ScreenshotTranslationResult } from '../../types';
+import { speakText } from '../../utils/speech';
 
 interface ScreenshotTranslationViewProps {
   ocrResult: ScreenshotTranslationResult;

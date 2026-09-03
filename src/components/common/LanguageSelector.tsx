@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeftRight, ChevronDown, Check } from 'lucide-react';
-import { SUPPORTED_LANGUAGES } from '../constants/languages';
-import { Language } from '../types';
+import { SUPPORTED_LANGUAGES } from '../../constants/languages';
+import { Language } from '../../types';
 
-interface LanguageSelectorProps {
+export interface LanguageSelectorProps {
   sourceLang: string;
   targetLang: string;
   onSourceChange: (lang: string) => void;

@@ -16,8 +16,8 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { InPlaceScreenshotTranslation } from '../types';
-import { speakText } from '../utils/speech';
+import { InPlaceScreenshotTranslation } from '../../types';
+import { speakText } from '../../utils/speech';
 
 interface InPlaceScreenshotCardProps {
   item: InPlaceScreenshotTranslation;

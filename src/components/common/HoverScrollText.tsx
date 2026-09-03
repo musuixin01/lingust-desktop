@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useId } from 'react';
 
-interface HoverScrollTextProps {
+export interface HoverScrollTextProps {
   text: string;
   className?: string;
   style?: React.CSSProperties;
@@ -39,7 +39,7 @@ export const HoverScrollText: React.FC<HoverScrollTextProps> = ({
   useEffect(() => {
     const checkOverflow = () => {
       if (!containerRef.current || !textRef.current) return;
-      const clientW = containerRef.current.clientWidth;
+      const clientW = textRef.current.parentElement?.clientWidth || containerRef.current.clientWidth;
       const scrollW = textRef.current.scrollWidth;
       const overflow = scrollW > clientW + 2;
       setIsOverflow(overflow);
@@ -71,8 +71,8 @@ export const HoverScrollText: React.FC<HoverScrollTextProps> = ({
       ref={containerRef as any}
       title={title}
       onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => setInternalHovered(true)}
+      onMouseLeave={() => setInternalHovered(false)}
       style={style}
       className={`relative overflow-hidden whitespace-nowrap select-text ${className}`}
     >
