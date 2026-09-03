@@ -9,23 +9,6 @@
 
 ---
 
-## [v1.2.4] - 2026-09-03
-
-### [Fixed] 悬浮翻译卡片拖拽与左上/右上交互区域优先级解耦 (Drag Precedence & Control Protection)
-- **左上与右上工具区域点击绝不触发窗口移动**：
-  - 在 `FloatingTranslatorCard` 中建立严格的交互层级与几何范围优先级机制，杜绝点击左上（红绿灯、清空、药丸收起、刷新）及右上（截图翻译、固定置顶、字号微调胶囊及浮层、偏好设置）功能按钮时产生的意外移动；
-  - 扩展 `handleMouseDown` 过滤逻辑，多维侦测 `button`、`input`、`textarea`、`select`、`[role="button"]`、`.no-drag`、`.resize-handle`、`.top-left-zone`、`.top-right-zone`、`.top-left-sensor`、`.top-right-sensor`、`.font-popover-container` 等所有交互载体；
-  - 引入几何坐标保底机制：对顶栏左上（卡片左边缘 68px 范围内）与右上（卡片右边缘 95~145px 范围内）操作集群赋予绝对交互优先级，即使点击在按钮间隙或微小内边距上也坚决不启动移动；
-  - 提升移动判定阈值从 4px 至 7px，从底层过滤快速点击或触控板按压时的微小光学抖动。
-- **左上与右上角缩放手柄（NW / NE）交互修复**：
-  - 将四个边角拉伸手柄（NW、NE、SW、SE）的 `z-index` 从被顶栏遮挡的 `z-20` 提升至顶层 `z-50`，并将交互热区扩展至 24px×24px（`w-6 h-6`）；
-  - 缩放手柄点击时主动清除待机拖拽状态并阻断冒泡，解决用户尝试拉伸左上角或右上角时因顶栏层级覆盖而误判为拖拽卡片的缺陷。
-- **极简模式与药丸模式同步强化**：
-  - 极简卡片模式（Minimal Mode）的左上角与右上角感知传感器（Sensor）及展开胶囊全面绑定 `onMouseDown={(e) => e.stopPropagation()}`，并标记 `.no-drag`；
-  - 药丸模式（Pill Mode）两侧展开感知区与控制集全面接入优先级阻断，保证胶囊交互与拖拽平稳共存。
-
----
-
 ## [v1.2.3] - 2026-09-03
 
 ### [Added] 动态紧凑排版与字号精确数值输入体系 (Dynamic Compact & Custom Font Sizing)
