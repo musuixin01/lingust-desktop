@@ -1,0 +1,21 @@
+<Window
+    x:Class="Linguist.WinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:Linguist.WinUI.Views"
+    mc:Ignorable="d"
+    Title="Linguist">
+
+    <Grid Background="Transparent" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <!-- 卡片视图与药丸视图的顺滑可见性切换 -->
+        <views:CardView
+            x:Name="CardControl"
+            Visibility="{x:Bind ViewModel.IsPillMode, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}" />
+
+        <views:PillView
+            x:Name="PillControl"
+            Visibility="{x:Bind ViewModel.IsPillMode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+    </Grid>
+</Window>

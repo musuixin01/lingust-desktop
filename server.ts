@@ -43,8 +43,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, SERVER_CONFIG.HOST, () => {
+  const server = app.listen(PORT, SERVER_CONFIG.HOST, () => {
     console.log(`[Linguist] Enterprise server running on http://${SERVER_CONFIG.HOST}:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`[Linguist] Port ${PORT} is already in use. Reusing existing running server.`);
+    } else {
+      console.error('[Linguist] Server listen error:', err);
+    }
   });
 }
 

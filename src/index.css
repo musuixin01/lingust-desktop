@@ -1,6 +1,52 @@
 @import "tailwindcss";
 
+html, body, #root {
+  background-color: transparent !important;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 @layer utilities {
+  /* Apple-style Liquid Glass (苹果超质感液体磨砂玻璃) */
+  .apple-liquid-glass {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(32px) saturate(190%) contrast(104%);
+    -webkit-backdrop-filter: blur(32px) saturate(190%) contrast(104%);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .apple-liquid-pill {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* Windows 11 Native Acrylic & Mica Complement */
+  .windows-acrylic-card {
+    background: rgba(18, 20, 32, 0.78);
+    backdrop-filter: blur(36px) saturate(160%);
+    -webkit-backdrop-filter: blur(36px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 32px 80px -10px rgba(0, 0, 0, 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  /* Electron Frameless Window Drag Regions */
+  .app-region-drag {
+    -webkit-app-region: drag;
+  }
+
+  .app-region-no-drag {
+    -webkit-app-region: no-drag;
+  }
+
   .frosted-glass-canvas {
     background-color: #0a0a1a;
     background-image: radial-gradient(circle at 10% 10%, #4338ca 0%, transparent 40%),
@@ -145,4 +191,13 @@
   background-color: rgba(0, 112, 235, 0.25);
   color: inherit;
 }
+
+/* Electron Transparent Window Support */
+html.electron-app,
+body.electron-app {
+  background: transparent !important;
+  background-color: transparent !important;
+  overflow: hidden;
+}
+
 
