@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const SERVER_CONFIG = {
-  PORT: Number(process.env.PORT) || 3000,
+  PORT: 3000,
   HOST: '0.0.0.0',
   BODY_LIMIT: '25mb',
   IS_PRODUCTION: process.env.NODE_ENV === 'production',

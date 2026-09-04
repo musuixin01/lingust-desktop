@@ -1,11 +1,45 @@
 @import "tailwindcss";
 
-/* Electron 桌面客户端：页面根背景必须透明，否则透明窗口会显示深色背景框 */
-html, body, #root {
-  background: transparent !important;
-}
-
 @layer utilities {
+  /* Apple-style Liquid Glass (苹果超质感液体磨砂玻璃) */
+  .apple-liquid-glass {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(32px) saturate(190%) contrast(104%);
+    -webkit-backdrop-filter: blur(32px) saturate(190%) contrast(104%);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.58),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .apple-liquid-pill {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* Windows 11 Native Acrylic & Mica Complement */
+  .windows-acrylic-card {
+    background: rgba(18, 20, 32, 0.78);
+    backdrop-filter: blur(36px) saturate(160%);
+    -webkit-backdrop-filter: blur(36px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 32px 80px -10px rgba(0, 0, 0, 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  /* Electron Frameless Window Drag Regions */
+  .app-region-drag {
+    -webkit-app-region: drag;
+  }
+
+  .app-region-no-drag {
+    -webkit-app-region: no-drag;
+  }
+
   .frosted-glass-canvas {
     background-color: #0a0a1a;
     background-image: radial-gradient(circle at 10% 10%, #4338ca 0%, transparent 40%),
@@ -92,6 +126,15 @@ html, body, #root {
     resize: none;
   }
 
+  @keyframes marquee-scroll {
+    0% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
   @keyframes linear-loading-slide {
     0% {
       transform: translateX(-120%);
@@ -99,6 +142,16 @@ html, body, #root {
     100% {
       transform: translateX(220%);
     }
+  }
+
+  .animate-marquee-scroll {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: marquee-scroll 16s linear infinite;
+  }
+
+  .animate-marquee-scroll:hover {
+    animation-play-state: paused;
   }
 
   .animate-linear-loading {
@@ -132,70 +185,12 @@ html, body, #root {
   color: inherit;
 }
 
-
-/* ---- 字体大小滑条（Font Size Slider）---- */
-.font-range {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    to right,
-    #3b82f6 var(--fill, 50%),
-    rgba(255, 255, 255, 0.12) var(--fill, 50%)
-  );
-  outline: none;
-  cursor: pointer;
-  transition: background 0.12s linear;
-}
-.font-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: #fff;
-  border: 3px solid #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.45);
-  cursor: grab;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.font-range::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15), 0 2px 10px rgba(59, 130, 246, 0.55);
-}
-.font-range::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.05);
-}
-.font-range::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: #fff;
-  border: 3px solid #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.45);
-  cursor: grab;
-}
-.font-range::-moz-range-track {
-  height: 6px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.12);
+/* Electron Transparent Window Support */
+html.electron-app,
+body.electron-app {
+  background: transparent !important;
+  background-color: transparent !important;
+  overflow: hidden;
 }
 
-/* ---- 字体面板入场动画（丝滑 fade + scale + 上移）---- */
-@keyframes font-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.font-panel-enter {
-  animation: font-panel-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-  transform-origin: top right;
-}
+

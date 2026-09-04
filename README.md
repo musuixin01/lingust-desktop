@@ -27,9 +27,8 @@
 | 🛡️ **智能容灾熔断** | 内置模型负载倒换池（`3.1-flash-lite` $\rightarrow$ `3.5-flash` $\rightarrow$ `flash-lite-latest`），遇 429 速率限制自动冷却 60 秒并无缝降级。 |
 | 📸 **原位框选截图翻译** | 屏幕任意区域自由截取，原位悬浮生成对照卡片，精准保留原文档段落与排版，呈现中英逐行严密对齐。 |
 | 📜 **超长文本悬停跑马灯** | 在最小化卡片状态下，搜索框和翻译结果超出边界时，鼠标悬停即自动触发平滑双向滚动（Hover-Scroll）。 |
-| 📚 **生词本与历史管理** | 生词本独立持久化（清空历史不误删收藏），多维度关键词检索、双语一键发音、JSON 导入导出与剪贴板备份。 |
+| 📚 **生词本与历史管理** | 本地极速持久化存储，支持收藏标记、多维度关键词检索、双语一键发音与批量清空。 |
 | 🎙️ **双语真声发音** | 原生 Web Speech 引擎支持美音、英音、中文等多种自然发音与音调调节。 |
-| 🖥️ **Electron 桌面客户端** | 透明无边框置顶悬浮窗 + 系统托盘 + 全局快捷键（Ctrl+Shift+L）+ 内置 Express 后端，Windows 安装包/便携版，macOS 配置预留。 |
 
 ---
 
@@ -42,11 +41,6 @@
 │   ├── config.ts                   # 服务端口与模型配置
 │   ├── routes/                     # 路由分发 (/api/translate, /api/ocr-translate, etc.)
 │   └── services/                   # 引擎调度适配层 (Gemini, DeepL, 有道, 离线字典)
-├── electron/                       # Electron 桌面客户端
-│   ├── main.cjs                    # 主进程（透明悬浮窗/内置后端/托盘/快捷键/IPC）
-│   └── preload.cjs                 # 预加载脚本（暴露 window.electronAPI）
-├── assets/                         # 静态资源
-│   └── icon.png                    # 应用图标（512×512，electron-builder 自动转 ico/icns）
 ├── src/                            # 前端核心源码
 │   ├── components/                 # 分类组件库
 │   │   ├── common/                 # 基础原子组件 (HoverScrollText, LanguageSelector)
@@ -88,11 +82,44 @@ PORT=3000
 ```
 
 ### 3. 运行开发环境
+
+**Web 浏览器开发预览**：
 ```bash
 npm install
 npm run dev
 ```
 访问：`http://localhost:3000`
+
+**桌面端原生调试 (Windows / macOS)**：
+```bash
+npm run electron:dev
+```
+
+---
+
+## 🖥️ 桌面客户端打包与发布 (Desktop Packaging)
+
+Linguist 采用现代化 Electron 34+ 跨平台无边框技术架构，深度支持 **Windows 11 原生亚克力（Acrylic/Mica）** 与 **macOS 原生超质感磨砂玻璃（Liquid Glass & Vibrancy）**。
+
+### 1. Windows 客户端构建 (NSIS 安装包 & 便携免安装版)
+```bash
+npm run electron:build:win
+```
+- **输出产物**：位于 `release/` 目录；
+- **安装包 (`.exe`)**：带有一键向导、桌面快捷方式、系统托盘常驻与开机启动支持；
+- **便携版 (`-portable.exe`)**：单文件免安装即开即用，适合 U 盘随身携带与企业纯净环境。
+
+### 2. macOS 客户端构建 (DMG 镜像 & 应用程序包)
+```bash
+npm run electron:build:mac
+```
+- **输出产物**：位于 `release/` 目录；
+- 产出高保真 `.dmg` 挂载镜像与 `.zip`，支持 Retina 视网膜屏幕与原生系统快捷键。
+
+### 3. 全局桌面快捷键
+- **`Alt + Space`**：全局呼出 / 隐藏悬浮翻译卡片；
+- **`Alt + S`**：全局随时框选截屏翻译（支持中英逐行原位严密对齐）；
+- **系统托盘驻留**：关闭主窗口自动最小化至右下角系统托盘，双击随时唤出。
 
 ---
 
@@ -131,41 +158,3 @@ npm start
 ## 📄 开源许可证
 
 本项目基于 MIT License 协议开源。
-
----
-
-## 🖥️ 桌面客户端运行与打包 (Electron)
-
-### 开发模式运行
-```bash
-# 方式一：自动检测（无 3000 dev server 时自动启动内置后端）
-npm run desktop
-
-# 方式二：复用外部 dev server（先 npm run dev，再启动桌面端）
-npm run desktop:dev
-```
-
-### 打包 Windows 安装包
-```bash
-# 国内网络建议先设置镜像
-$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
-$env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
-
-# 打包（NSIS 安装包 + Portable 便携版，输出至 release/）
-npm run desktop:pack
-```
-
-### 打包 macOS 版（需在 macOS 环境执行）
-```bash
-npm run desktop:pack:mac
-```
-
-### 全局快捷键
-| 快捷键 | 功能 |
-| :--- | :--- |
-| `Ctrl+Shift+L`（macOS `Cmd+Shift+L`） | 切换悬浮卡片显示/隐藏 |
-| `Alt+S` | 触发截图翻译 |
-
-### 系统托盘
-右下角托盘图标支持「显示/隐藏悬浮卡片」「退出」，左键单击切换显示状态。关闭窗口 = 隐藏到托盘（悬浮常驻），右键托盘「退出」才真正退出。
-

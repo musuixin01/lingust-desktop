@@ -1,32 +1,15 @@
-import React, { useRef, useState } from 'react';
-import {
-  X,
-  Search,
-  Star,
-  Trash2,
-  Clock,
-  Volume2,
-  Download,
-  Upload,
-  Copy,
-  Check,
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Search, Star, Trash2, Clock, Volume2, ArrowRight } from 'lucide-react';
 import { TranslationResult } from '../../types';
 import { speakText } from '../../utils/speech';
 
 interface HistoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  /** 翻译历史（独立列表） */
   history: TranslationResult[];
-  /** 生词本（独立持久化，与历史解耦） */
-  favorites: TranslationResult[];
   onSelectResult: (result: TranslationResult) => void;
   onToggleFavorite: (id: string) => void;
   onClearHistory: () => void;
-  onClearFavorites: () => void;
-  onExport: (type: 'history' | 'favorites') => void;
-  onImport: (file: File) => void;
   isDark?: boolean;
 }
 
@@ -34,52 +17,30 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   isOpen,
   onClose,
   history,
-  favorites,
   onSelectResult,
   onToggleFavorite,
   onClearHistory,
-  onClearFavorites,
-  onExport,
-  onImport,
   isDark = false,
 }) => {
-  const [tab, setTab] = useState<'all' | 'favorites'>('all');
+  const [filter, setFilter] = useState<'all' | 'favorites'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [copied, setCopied] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const isFav = (item: TranslationResult) =>
-    favorites.some((f) => f.sourceText.trim().toLowerCase() === item.sourceText.trim().toLowerCase());
-
-  const activeList = tab === 'favorites' ? favorites : history;
-  const filtered = activeList
+  const filteredHistory = history
     .filter((item) => {
+      if (filter === 'favorites' && !item.isFavorite) return false;
       if (!searchQuery.trim()) return true;
       const query = searchQuery.toLowerCase();
       return (
         item.sourceText.toLowerCase().includes(query) ||
-        item.translatedText.toLowerCase().includes(query) ||
-        (item.definitions || []).some((d) => d.meaning.toLowerCase().includes(query))
+        item.translatedText.toLowerCase().includes(query)
       );
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  const handleCopyActive = async () => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(filtered, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch (e) {
-      console.warn('复制到剪贴板失败:', e);
-    }
-  };
-
-  const handleImportClick = () => fileInputRef.current?.click();
-
   return (
-    <div className="fixed inset-0 z-[10000] flex justify-end bg-black/30 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className={`w-full max-w-sm h-full shadow-2xl flex flex-col border-l transition-all ${
           isDark
@@ -93,43 +54,13 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             <Clock className="w-4 h-4 text-blue-500" />
             <h3 className="font-semibold text-sm">翻译历史与生词本</h3>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleImportClick}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
-              title="导入 JSON 数据"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onExport(tab)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
-              title={`导出当前「${tab === 'favorites' ? '生词本' : '历史'}」为 JSON`}
-            >
-              <Download className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
-              title="关闭"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onImport(file);
-                e.target.value = '';
-              }}
-            />
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Search & Filter Bar */}
@@ -153,9 +84,9 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
             <div className="flex gap-1 p-0.5 rounded-lg bg-black/5 dark:bg-white/5 text-xs">
               <button
                 type="button"
-                onClick={() => setTab('all')}
-                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                  tab === 'all'
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1 rounded-md transition-all ${
+                  filter === 'all'
                     ? 'bg-white dark:bg-slate-800 shadow-xs font-semibold text-blue-600 dark:text-blue-400'
                     : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
                 }`}
@@ -164,56 +95,39 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setTab('favorites')}
-                className={`px-3 py-1 rounded-md flex items-center gap-1 transition-all cursor-pointer ${
-                  tab === 'favorites'
+                onClick={() => setFilter('favorites')}
+                className={`px-3 py-1 rounded-md flex items-center gap-1 transition-all ${
+                  filter === 'favorites'
                     ? 'bg-white dark:bg-slate-800 shadow-xs font-semibold text-amber-500'
                     : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 <Star className="w-3 h-3 fill-current" />
-                <span>生词本 ({favorites.length})</span>
+                <span>生词本 ({history.filter((i) => i.isFavorite).length})</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-1">
-              {filtered.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleCopyActive}
-                  className="text-[11px] text-slate-400 hover:text-blue-500 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  title="复制当前列表为 JSON"
-                >
-                  {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                  <span>{copied ? '已复制' : '复制'}</span>
-                </button>
-              )}
-              {activeList.length > 0 && (
-                <button
-                  type="button"
-                  onClick={tab === 'favorites' ? onClearFavorites : onClearHistory}
-                  className="text-[11px] text-red-500 hover:text-red-600 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-red-500/10 transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>清空</span>
-                </button>
-              )}
-            </div>
+            {history.length > 0 && (
+              <button
+                type="button"
+                onClick={onClearHistory}
+                className="text-[11px] text-red-500 hover:text-red-600 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-red-500/10"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>清空</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* History / Favorites List */}
+        {/* History List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {filtered.length === 0 ? (
+          {filteredHistory.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-xs">
-              {searchQuery
-                ? '没有找到匹配的记录'
-                : tab === 'favorites'
-                ? '生词本空空如也，点击词条旁的星标收藏吧！'
-                : '暂无历史记录，去划词或输入查词吧！'}
+              {searchQuery ? '没有找到匹配的翻译记录' : '暂无历史记录，去划词或输入查词吧！'}
             </div>
           ) : (
-            filtered.map((item) => (
+            filteredHistory.map((item) => (
               <div
                 key={item.id}
                 onClick={() => {
@@ -250,54 +164,32 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {tab === 'favorites' && item.translatedText ? (
-                      /* 生词本：双语一键发音（原文 + 译文） */
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => speakText(item.sourceText, item.sourceLang)}
-                          className="p-1 rounded-md text-slate-400 hover:text-blue-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                          title={`朗读原文 (${item.sourceLang})`}
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => speakText(item.translatedText, item.targetLang)}
-                          className="p-1 rounded-md text-slate-400 hover:text-emerald-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                          title={`朗读译文 (${item.targetLang})`}
-                        >
-                          <Volume2 className="w-3.5 h-3.5 text-emerald-500/70" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => speakText(item.sourceText, item.sourceLang)}
-                        className="p-1 rounded-md text-slate-400 hover:text-blue-500 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                        title="朗读"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => speakText(item.sourceText, item.sourceLang)}
+                      className="p-1 rounded-md text-slate-400 hover:text-blue-500 hover:bg-black/5 dark:hover:bg-white/10"
+                      title="朗读"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => onToggleFavorite(item.id)}
                       className={`p-1 rounded-md transition-colors ${
-                        isFav(item)
+                        item.isFavorite
                           ? 'text-amber-500 fill-amber-500'
                           : 'text-slate-400 hover:text-amber-500'
                       }`}
-                      title={isFav(item) ? '移出生词本' : '收藏到生词本'}
+                      title={item.isFavorite ? '移出生词本' : '收藏到生词本'}
                     >
-                      <Star className={`w-3.5 h-3.5 ${isFav(item) ? 'fill-current' : ''}`} />
+                      <Star className={`w-3.5 h-3.5 ${item.isFavorite ? 'fill-current' : ''}`} />
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-1 border-t border-black/5 dark:border-white/5">
                   <span>
-                    {item.sourceLang} → {item.targetLang} · {item.engine || 'online'}
+                    {item.sourceLang} → {item.targetLang}
                   </span>
                   <span>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>

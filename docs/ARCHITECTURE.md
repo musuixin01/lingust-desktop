@@ -15,8 +15,7 @@
 │                      业务服务层 (Services & Hooks)           │
 │  - translationService: 统一多引擎请求调度与离线降级          │
 │  - ocrService: 截图 OCR 数据清洗与对齐                      │
-│  - storageService: 本地持久化与历史记录管理                 │
-│  - dataService: 生词本独立持久化与数据导入导出             │
+│  - storageService: 本地持久化与生词本管理                   │
 │  - useDraggable: 桌面边界吸附与平滑阻尼拖动                  │
 └──────────────────────────────┬──────────────────────────────┘
                                │ RESTful API (JSON over HTTP)
@@ -54,41 +53,24 @@
 - 当卡片缩小至极限高度（$\le 145\text{px}$）或宽度较窄时，自动移除外围冗余控件，聚焦核心“输入框+释义”。
 - 配合 CSS 原生动态 `@keyframes` 与平滑过渡，在鼠标移入时依内容溢出距离自动平滑来回循环滚动，保证小卡片空间利用率达到极致。
 
-### 2.4 生词本独立持久化与数据导入导出 (Independent Wordbook & Data Exchange)
-- **生词本与历史解耦**：
-  - 生词本独立存储于本地键 `linguist_favorites`，翻译历史存储于 `linguist_history`，两者互不干扰；清空历史绝不误删生词本；
-  - 以「原文（忽略大小写）」作为生词唯一身份标识（`favoritesService.isFavoriteByText` / `toggleFavoriteByItem`），避免重复词条；
-  - 收藏快照保留完整词条详情（音标、词性、例句、同反义词），卡片收藏按钮、历史星标与生词本数据三方实时联动。
-- **数据导入导出流水线**：
-  - 导出：`dataExchangeService.exportToFile` 将历史/生词本序列化为带元信息包裹的 JSON（`app` / `type` / `version` / `exportedAt` / `items`）并触发浏览器下载；
-  - 导入：`dataExchangeService.importFromFile` 读取文件，兼容包裹结构与裸数组，按「原文」去重后自动分流——带收藏标记的归入生词本，其余归入历史；
-  - 剪贴板：`copyToClipboard` 支持将列表以 JSON 文本临时迁移与分享。
-- **双语一键发音**：生词本条目提供原文（`sourceLang`）与译文（`targetLang`）双发音靶标，复用 `utils/speech.ts` Web Speech 引擎。
+### 2.4 Electron 原生桌面端分层与无边框磨砂架构 (Desktop Native Architecture)
+- **主进程与渲染进程解耦设计**：
+  - 主进程 (`/electron/main.ts`)：专责原生窗口生命周期、系统托盘（System Tray）、全局快捷键注册（`Alt+Space`, `Alt+S`）、以及通过 `desktopCapturer` 调用底层显示器捕获；
+  - 预加载安全桥 (`/electron/preload.ts`)：基于 Electron `contextBridge` 与严格沙箱规范向渲染层注入强类型 `window.electronAPI`；
+  - 渲染进程 (`/src/`)：自适应检测是否运行于原生环境（`isElectron()`），若为原生环境则剔除仿真壁纸并激活窗口穿透、原生拖拽区（`-webkit-app-region: drag`）与窗口尺寸双向同步。
+- **Windows 11 Acrylic & macOS Liquid Glass 原生材质**：
+  - Windows 端：配置 `transparent: true` 与 `backgroundMaterial: 'acrylic'`，融合 Win 11 硬件加速抗锯齿圆角与纯粹亚克力半透明材质；
+  - macOS 端：配置 `vibrancy: 'under-window'`，辅以视网膜级高饱和 Liquid Glass 滤镜（`backdrop-filter: blur(32px) saturate(190%)`）。
 
+## 3. 跨平台构建与发布流水线 (Build Pipeline)
 
----
+- **Windows 构建目标**：
+  - 执行 `npm run electron:build:win`；
+  - 基于 `electron-builder` 打包出 NSIS 安装程序（带一键安装向导、桌面快捷方式与开机自启选项）以及 Portable 免安装绿色便携单文件版。
+- **macOS 构建目标**：
+  - 执行 `npm run electron:build:mac`；
+  - 产出高保真 DMG 挂载磁盘镜像与 Zip 包，嵌入安全沙盒授权文件（`entitlements.mac.plist`）。
+- **Web / 桌面混合启动模式**：
+  - Web 沙盒预览：`npm run dev` 启动 Vite + Express 本地容灾服务；
+  - 桌面原生调试：`npm run electron:dev` 启动本地 Vite 与 Electron 原生无边框桌面窗口。
 
-## 3. 桌面客户端架构（Electron）
-
-### 3.1 进程模型
-- **主进程**（`electron/main.cjs`）：窗口生命周期、系统托盘、全局快捷键、内置后端启动、IPC 调度；
-- **渲染进程**：React 19 + Vite 构建的前端，通过 `preload.cjs` 暴露的 `window.electronAPI` 与主进程通信（`contextIsolation:true, nodeIntegration:false`）；
-- **内置后端**：主进程 require `dist/server.cjs` 的 `startServer`，在 127.0.0.1 随机端口启动 Express，渲染进程通过 `http://127.0.0.1:<port>` 调用翻译 API。
-
-### 3.2 窗口与卡片几何
-- `WINDOW_EDGE=0`（前后端必须一致）：窗口紧贴卡片，无四周留白背景框；
-- 窗口尺寸 = 卡片尺寸；卡片在窗口内固定定位于 `(0, 0)`；
-- 桌面模式卡片采用深色半透明底（标准 `rgba(15,23,42,0.55)` / 药丸 `rgba(2,6,23,0.6)`）+ `backdrop-blur-3xl` 毛玻璃，保证主题色与文字可读性；
-- 拖动：渲染进程检测到拖动后通过 IPC `dragMove(mouseX, mouseY)` 通知主进程，主进程以拖动起始窗口位置为锚 `setPosition`，并 clamp 到屏幕工作区；
-- 缩放：渲染进程尺寸变化通过 `useEffect` 同步 IPC `resizeWindow(w, h)`，主进程 `setSize(w+edge*2, h+edge*2)`；药丸/极简形态变化亦同步。
-
-### 3.3 后端启动策略（resolveBackend）
-1. 显式 `LINGUIST_DEV_URL` 环境变量 → 直接使用该 URL；
-2. 开发模式检测 3000 端口 `/api/health` 返回 200 → 复用外部 dev server；
-3. 否则启动内置后端（`LINGUIST_EMBEDDED=1` + `NODE_ENV=production`，端口 31000~35999 随机，staticDir 指向 `dist/`）。
-
-### 3.4 打包与分发
-- electron-builder 配置于 `package.json` 的 `build` 字段；
-- Windows：NSIS 安装包 + Portable 便携版，输出至 `release/`；
-- macOS：dmg + zip（配置预留，需在 macOS 环境执行 `npm run desktop:pack:mac`）；
-- asar 打包：`dist/`、`electron/`、`assets/`、`package.json` 及运行时 dependencies 打入 asar；devDependencies（如 vite）不打包——`server.ts` 已将 vite 改为动态 import 仅 dev 分支加载。

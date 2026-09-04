@@ -13,6 +13,15 @@ import {
   ChevronRight,
   Zap,
   Crop,
+  Code2,
+  Monitor,
+  Laptop,
+  Check,
+  Copy,
+  Terminal,
+  X,
+  Layers,
+  Sparkle,
 } from 'lucide-react';
 import { AppSettings } from '../../types';
 
@@ -30,52 +39,96 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
   isDark = true,
 }) => {
   const [activeTab, setActiveTab] = useState<'tech' | 'story' | 'vocab' | 'bilingual'>('bilingual');
+  const [workspaceScene, setWorkspaceScene] = useState<'reader' | 'vscode' | 'pure'>('reader');
+  const [showDesktopGuide, setShowDesktopGuide] = useState(false);
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCmd(id);
+    setTimeout(() => setCopiedCmd(null), 2000);
+  };
 
   return (
     <div
       id="desktop-simulator-workspace"
       className="w-full h-full flex flex-col relative overflow-hidden select-text"
     >
-      {/* macOS Desktop Top Menu Bar */}
-      <header className="h-7 w-full bg-black/40 backdrop-blur-md border-b border-white/10 px-3.5 flex items-center justify-between text-xs text-slate-200 z-20 select-none">
-        <div className="flex items-center gap-4">
+      {/* macOS / Windows Desktop Top Menu Bar */}
+      <header className="h-8 w-full bg-black/50 backdrop-blur-xl border-b border-white/10 px-3.5 flex items-center justify-between text-xs text-slate-200 z-20 select-none">
+        <div className="flex items-center gap-3 sm:gap-4">
           <div className="font-bold text-[13px] flex items-center gap-1.5 text-white">
             <span className="text-sm"></span>
             <span className="font-semibold text-xs tracking-tight">Linguist</span>
           </div>
-          <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-300">
-            <span className="hover:text-white cursor-default">File</span>
-            <span className="hover:text-white cursor-default">Edit</span>
+
+          {/* Workspace scene selector */}
+          <div className="flex items-center p-0.5 rounded-lg bg-white/10 border border-white/10 text-[11px]">
             <button
               type="button"
-              onClick={onOpenSnipper}
-              className="hover:text-blue-300 text-blue-400 font-medium flex items-center gap-1 cursor-pointer"
-              title="截图翻译"
+              onClick={() => setWorkspaceScene('reader')}
+              className={`px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer ${
+                workspaceScene === 'reader'
+                  ? 'bg-blue-600 text-white font-medium shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+              title="切换至双语阅读器工作区"
             >
-              <Crop className="w-3 h-3" />
-              <span>截图翻译</span>
+              <Globe className="w-3 h-3" />
+              <span className="hidden xs:inline">双语阅读</span>
             </button>
-            <span className="hover:text-white cursor-default">Window</span>
-            <span className="hover:text-white cursor-default">Help</span>
+            <button
+              type="button"
+              onClick={() => setWorkspaceScene('vscode')}
+              className={`px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer ${
+                workspaceScene === 'vscode'
+                  ? 'bg-blue-600 text-white font-medium shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+              title="切换至 VS Code 编程工作区 (划词测试代码)"
+            >
+              <Code2 className="w-3 h-3" />
+              <span className="hidden xs:inline">VS Code</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkspaceScene('pure')}
+              className={`px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer ${
+                workspaceScene === 'pure'
+                  ? 'bg-blue-600 text-white font-medium shadow-xs'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+              title="切换至纯净桌面壁纸 (无遮挡悬浮测试)"
+            >
+              <Monitor className="w-3 h-3" />
+              <span className="hidden xs:inline">纯净桌面</span>
+            </button>
           </div>
         </div>
 
         {/* Right status bar */}
-        <div className="flex items-center gap-3 text-[11px] text-slate-300">
+        <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-300">
+          <button
+            type="button"
+            onClick={() => setShowDesktopGuide(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 transition-all cursor-pointer font-medium text-[11px]"
+            title="查看如何在您本地 Windows/Mac 电脑上启动原生桌面客户端"
+          >
+            <Laptop className="w-3.5 h-3.5 text-emerald-400" />
+            <span>💻 本地桌面端运行</span>
+          </button>
+
           <button
             type="button"
             onClick={onOpenSnipper}
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-[10px] text-blue-300 border border-blue-400/30 transition-all cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-[11px] text-blue-300 border border-blue-400/30 transition-all cursor-pointer"
             title="点击启动截图/框选翻译"
           >
             <Crop className="w-3 h-3 text-blue-400 animate-pulse" />
-            <span>截图翻译 (中英逐行)</span>
+            <span>截图翻译</span>
           </button>
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-[10px] text-emerald-300 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>划词翻译: {settings.selectionTranslation ? '已就绪' : '已关闭'}</span>
-          </div>
-          <Wifi className="w-3.5 h-3.5 text-slate-300" />
+
+          <Wifi className="w-3.5 h-3.5 text-slate-300 hidden xs:block" />
           <span className="font-mono text-[11px]">
             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
@@ -110,10 +163,11 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
         </div>
 
         {/* Mock Application Window (Safari / Notes / Literature Reader) */}
-        <div
-          id="mock-browser-document"
-          className="w-full rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/15 shadow-2xl overflow-hidden text-slate-200 flex flex-col"
-        >
+        {workspaceScene === 'reader' && (
+          <div
+            id="mock-browser-document"
+            className="w-full rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/15 shadow-2xl overflow-hidden text-slate-200 flex flex-col"
+          >
           {/* Mock Browser Header */}
           <div className="px-3 sm:px-4 py-2 border-b border-white/10 bg-slate-950/40 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-2 min-w-0">
@@ -322,7 +376,243 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
             )}
           </div>
         </div>
+      )}
+
+        {/* Workspace Scene 2: VS Code Developer IDE (划词测试代码注释与英文报错) */}
+        {workspaceScene === 'vscode' && (
+          <div
+            id="mock-vscode-window"
+            className="w-full rounded-2xl bg-[#1e1e1e] border border-white/15 shadow-2xl overflow-hidden text-slate-300 flex flex-col font-mono text-xs"
+          >
+            {/* VS Code Title Bar */}
+            <div className="px-3 py-2 bg-[#252526] border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5 shrink-0">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                </div>
+                <span className="text-[11px] text-slate-400 font-sans ml-2">Visual Studio Code - LinguistCore</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-sans">
+                <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded border border-blue-400/30">TypeScript</span>
+                <span>UTF-8</span>
+              </div>
+            </div>
+
+            {/* Editor Tabs */}
+            <div className="flex items-center bg-[#2d2d2d] border-b border-white/10 overflow-x-auto text-[11px]">
+              <div className="px-3 py-1.5 bg-[#1e1e1e] border-t-2 border-blue-500 text-white flex items-center gap-1.5">
+                <Code2 className="w-3 h-3 text-blue-400" />
+                <span>translator.ts</span>
+              </div>
+              <div className="px-3 py-1.5 text-slate-400 hover:text-slate-200 flex items-center gap-1.5 cursor-pointer">
+                <span>electron-main.ts</span>
+              </div>
+            </div>
+
+            {/* Code Content */}
+            <div className="p-4 sm:p-5 max-h-[60vh] overflow-y-auto space-y-1.5 leading-relaxed selection:bg-blue-600 selection:text-white">
+              <p className="text-slate-500">// 提示：鼠标划选任意英文术语或报错信息，即可直接唤醒悬浮翻译：</p>
+              <p>
+                <span className="text-pink-400">interface</span> <span className="text-yellow-300">TranslationEngineOptions</span> &#123;
+              </p>
+              <p className="pl-4">
+                <span className="text-blue-300">concurrencyLimit</span>: <span className="text-emerald-400">number</span>;
+                <span className="text-slate-500 ml-3">// High-throughput asynchronous dispatch</span>
+              </p>
+              <p className="pl-4">
+                <span className="text-blue-300">cacheStrategy</span>: <span className="text-amber-300">'immutable-offline'</span> | <span className="text-amber-300">'stale-while-revalidate'</span>;
+              </p>
+              <p className="pl-4">
+                <span className="text-blue-300">fallbackEngine</span>: <span className="text-yellow-300">OfflineLocalDictionary</span>;
+              </p>
+              <p>&#125;</p>
+              <p className="text-slate-500 pt-2">// Runtime exception handler example:</p>
+              <p>
+                <span className="text-purple-400">export async function</span> <span className="text-blue-400">executeInference</span>(prompt: <span className="text-emerald-400">string</span>) &#123;
+              </p>
+              <p className="pl-4">
+                <span className="text-purple-400">try</span> &#123;
+              </p>
+              <p className="pl-8 text-slate-300">
+                <span className="text-purple-400">const</span> response = <span className="text-purple-400">await</span> geminiClient.<span className="text-blue-300">generateContent</span>(prompt);
+              </p>
+              <p className="pl-8 text-slate-300">
+                <span className="text-purple-400">return</span> response.text;
+              </p>
+              <p className="pl-4">
+                &#125; <span className="text-purple-400">catch</span> (err) &#123;
+              </p>
+              <p className="pl-8 text-rose-400">
+                <span className="text-slate-500">//</span> Error: Connection pool exhausted. Upstream gateway returned 504 Gateway Timeout.
+              </p>
+              <p className="pl-8 text-slate-300">
+                console.<span className="text-blue-300">warn</span>(<span className="text-amber-300">"Gracefully degrading to offline dictionary model"</span>);
+              </p>
+              <p className="pl-4">&#125;</p>
+              <p>&#125;</p>
+            </div>
+          </div>
+        )}
+
+        {/* Workspace Scene 3: Pure Clean Desktop (无遮挡桌面图标，呈现极致悬浮) */}
+        {workspaceScene === 'pure' && (
+          <div className="w-full flex-1 flex flex-col justify-between py-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-6 max-w-2xl">
+              {[
+                { name: 'Finder', icon: '📁' },
+                { name: 'Terminal', icon: '💻' },
+                { name: 'Visual Studio', icon: '⚡' },
+                { name: 'Paper_Draft.pdf', icon: '📄' },
+                { name: 'Research_Notes', icon: '📝' },
+                { name: 'Trash', icon: '🗑️' },
+              ].map((item) => (
+                <div
+                  key={item.name}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer group"
+                >
+                  <span className="text-3xl filter drop-shadow-md group-hover:scale-110 transition-transform">{item.icon}</span>
+                  <span className="text-[11px] text-white/90 drop-shadow-sm font-medium tracking-tight text-center truncate w-full">
+                    {item.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 text-center max-w-md mx-auto text-slate-300 text-xs mt-8">
+              <p className="font-semibold text-white mb-1">🌌 纯净桌面悬浮视图</p>
+              <p className="text-slate-400 text-[11px]">
+                您可以拖动翻译卡片至任意位置，缩放为药丸胶囊，体验纯粹的桌面磨砂与亚克力透光质感。
+              </p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Desktop Native Running Guide Modal (本地桌面端一键运行指南) */}
+      {showDesktopGuide && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-[#0e111a] border border-white/20 rounded-2xl shadow-2xl p-5 space-y-4 text-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Laptop className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">如何在本地电脑运行桌面端？</h3>
+                  <p className="text-[11px] text-slate-400">Windows 11 亚克力磨砂 & macOS 原生悬浮客户端</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDesktopGuide(false)}
+                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 space-y-1">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <span>为什么需要本地运行？</span>
+                </div>
+                <p className="text-[11px] text-blue-200/80 leading-relaxed">
+                  当前您所在的 AI Studio 是运行在 Google Cloud 云端的无头 Linux 容器中（通过网页流式预览）。真正的 Windows 亚克力无边框窗口和全局快捷键（<code className="text-white">Alt+Space</code> / <code className="text-white">Alt+S</code>）需要在您本地计算机中直接运行。
+                </p>
+              </div>
+
+              {/* Step 1 */}
+              <div className="space-y-1.5">
+                <div className="font-medium text-white flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-blue-600 text-[10px] flex items-center justify-center font-bold">1</span>
+                  <span>导出代码并在本地安装依赖</span>
+                </div>
+                <p className="text-[11px] text-slate-400 pl-5">
+                  点击 AI Studio 右上角「Export to GitHub」或下载 ZIP 解压到本地，在项目根目录打开终端执行：
+                </p>
+                <div className="ml-5 p-2 rounded-lg bg-black/50 border border-white/10 font-mono text-[11px] flex items-center justify-between">
+                  <code>npm install</code>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy('npm install', 'install')}
+                    className="text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    {copiedCmd === 'install' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="space-y-1.5">
+                <div className="font-medium text-white flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-blue-600 text-[10px] flex items-center justify-center font-bold">2</span>
+                  <span>一键启动原生透明桌面悬浮窗 (本地调试)</span>
+                </div>
+                <div className="ml-5 p-2 rounded-lg bg-black/50 border border-white/10 font-mono text-[11px] flex items-center justify-between">
+                  <code className="text-emerald-400">npm run electron:dev</code>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy('npm run electron:dev', 'dev')}
+                    className="text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    {copiedCmd === 'dev' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="space-y-1.5">
+                <div className="font-medium text-white flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-blue-600 text-[10px] flex items-center justify-center font-bold">3</span>
+                  <span>打包 Windows / macOS 独立客户端安装包</span>
+                </div>
+                <div className="ml-5 space-y-1.5">
+                  <div className="p-2 rounded-lg bg-black/50 border border-white/10 font-mono text-[11px] flex items-center justify-between">
+                    <div>
+                      <span className="text-blue-400">Windows (.exe 安装包 & 便携版): </span>
+                      <code>npm run electron:build:win</code>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('npm run electron:build:win', 'win')}
+                      className="text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      {copiedCmd === 'win' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-black/50 border border-white/10 font-mono text-[11px] flex items-center justify-between">
+                    <div>
+                      <span className="text-pink-400">macOS (.dmg 镜像): </span>
+                      <code>npm run electron:build:mac</code>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('npm run electron:build:mac', 'mac')}
+                      className="text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      {copiedCmd === 'mac' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/10 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDesktopGuide(false)}
+                className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-colors cursor-pointer"
+              >
+                我知道了，在 Web 仿真环境中继续体验
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

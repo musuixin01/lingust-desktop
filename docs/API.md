@@ -142,49 +142,20 @@
 
 ---
 
-## 5. 本地数据导入导出格式 (Data Exchange Format)
+## 5. Electron 原生 IPC 接口规范 (Desktop IPC Bridge)
 
-历史与生词本的导出 / 导入为**纯前端本地能力**（非 HTTP 接口），由 `src/services/dataService.ts` 的 `dataExchangeService` 提供。
+在桌面端环境下，渲染进程通过 `window.electronAPI`（由 `/electron/preload.ts` 注入）与主进程进行类型安全的双向异步交互：
 
-### 5.1 导出文件结构（包裹格式）
+| 接口方法 / 属性 | 参数签名 | 功能说明 |
+| :--- | :--- | :--- |
+| `isElectron` | `boolean` (只读) | 当前是否处于 Electron 原生桌面客户端环境 |
+| `platform` | `'win32' \| 'darwin' \| 'linux'` | 操作系统平台标识 |
+| `minimizeWindow()` | `() => Promise<void>` | 最小化窗口至任务栏 |
+| `maximizeWindow()` | `() => Promise<void>` | 切换窗口最大化 / 还原 |
+| `closeWindow()` | `() => Promise<void>` | 隐藏窗口至系统托盘 (Tray) 或退出 |
+| `setAlwaysOnTop(flag)` | `(flag: boolean) => Promise<void>` | 设置窗口是否永远处于最前端顶层 |
+| `syncWindowSize(w, h)` | `(w: number, h: number) => Promise<void>` | 动态同步调整宿主原生无边框窗口像素尺寸 |
+| `captureDesktopScreen()` | `() => Promise<string>` | 调用底层 `desktopCapturer` 返回主屏幕截图 Base64 DataURL |
+| `onShortcutTriggered(cb)`| `(cb: (action: string) => void) => () => void` | 监听全局快捷键触发事件（如 `'screenshot'`） |
+| `onTrayAction(cb)` | `(cb: (action: string) => void) => () => void` | 监听系统托盘点击菜单指令（如 `'open-settings'`） |
 
-```json
-{
-  "app": "Linguist",
-  "type": "favorites",
-  "version": 1,
-  "exportedAt": "2026-09-03T00:00:00.000Z",
-  "items": [
-    {
-      "id": "res-1725321600000",
-      "sourceText": "Efficient",
-      "translatedText": "高效的；有能力的",
-      "sourceLang": "EN",
-      "targetLang": "ZH",
-      "isWord": true,
-      "isFavorite": true,
-      "phonetic": { "us": "/ɪˈfɪʃnt/", "uk": "/ɪˈfɪʃnt/" },
-      "definitions": [ { "partOfSpeech": "adj.", "meaning": "高效的；有能力的" } ],
-      "examples": [ { "src": "...", "dst": "..." } ],
-      "synonyms": ["effective", "productive"],
-      "timestamp": 1725321600000,
-      "engine": "gemini"
-    }
-  ]
-}
-```
-
-**字段说明**：
-- `type`：`"history"` 或 `"favorites"`，仅用于标注语义，导入时以条目级 `isFavorite` 为准；
-- `items`：`TranslationResult[]` 数组，元素字段与 `/api/translate` 成功响应保持一致。
-
-### 5.2 导入规则
-
-- 兼容**包裹结构**（如上）与**裸数组**（`TranslationResult[]`）两种格式；
-- 仅保留含有效 `sourceText` 与 `translatedText` 的条目；
-- 按「原文（忽略大小写）」自动去重，上限 50 条；
-- 自动分流：`isFavorite: true` 的条目归入生词本（`linguist_favorites`），其余归入翻译历史（`linguist_history`）。
-
-### 5.3 剪贴板格式
-
-与导出文件中的 `items` 数组一致（JSON 数组文本），便于临时迁移与分享。

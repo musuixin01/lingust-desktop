@@ -29,6 +29,9 @@ Linguist 是一款面向现代化桌面场景的高端生产力翻译与词典�
 | **主悬浮卡片背景** (`bg-white/10`) | `rgba(255, 255, 255, 0.10)` | 核心悬浮卡片、截图原地卡片 |
 | **次级容器背景** (`bg-white/5`) | `rgba(255, 255, 255, 0.05)` | 语言选择胶囊、词性释义块、输入框外壳 |
 | **深色悬浮抽屉** (`bg-slate-900/95` 或 `bg-[#0c0d14]`) | `rgba(12, 13, 20, 0.95)` | 设置模态弹窗、生词本抽屉、悬停多行展开浮层 |
+| **苹果风格超质感液体玻璃** (`.apple-liquid-glass`) | `blur(32px) saturate(190%) contrast(104%)`, 双层内外阴影与反光 | 悬浮卡片在桌面端或大尺寸下的液体透光质感 |
+| **苹果风格胶囊药丸** (`.apple-liquid-pill`) | `blur(28px) saturate(190%)`, 360° 全圆角胶囊与微光透射 | 最小化悬浮药丸形态 |
+| **Windows 11 原生亚克力材质** (`.windows-acrylic-card`) | `rgba(18, 20, 32, 0.78)` + `blur(36px) saturate(160%)` | Windows 11 Acrylic / Mica 桌面原生融合 |
 | **模糊滤镜强度** (`backdrop-blur-3xl`) | `blur(40px)` 或 `-webkit-backdrop-filter: blur(40px)` | 悬浮卡片高斯模糊核心参数 |
 | **微光外边框** (`border-white/20`) | `1px solid rgba(255, 255, 255, 0.20)` | 静止态卡片与容器边界 |
 | **激活高亮边框** (`border-white/35`) | `1px solid rgba(255, 255, 255, 0.35)` | 拖拽中、获取焦点中、激活选态 |
@@ -81,8 +84,7 @@ Linguist 是一款面向现代化桌面场景的高端生产力翻译与词典�
 
 ### 3.3 动态字号微调与输入规范 (Custom Font Sizing)
 - **默认精致基准**：默认字号比例设为 `92%`（`customFontSize: 92`），使文本与界面在紧凑状态下自然呼吸，解决卡片偏小而字体显过大的失调问题；
-- **全范围自由数值输入**：支持在 `60%` ~ `150%` 之间直接输入任意数字调节字号；
-- **浏览器级整体缩放（Zoom）**：字号调节通过对卡片内容根容器应用 **`zoom: effectiveFontScale`**（`effectiveFontScale = (customFontSize / 100) * fluidScale`）实现，字体、间距、图标、圆角全部元素**等比整体缩放**，效果等同浏览器放大缩小；禁止退回到仅靠 `fontSize` 百分比（固定像素 Tailwind 类不会跟随，导致拖动无反应）；
+- **全范围自由数值输入**：支持在 `60%` ~ `150%` 之间直接输入任意数字调节字号，并由 `effectiveFontScale = (customFontSize / 100) * fluidScale` 结合容器几何长宽平滑缩放；
 - **行高与外边距数学收敛**：在动态紧凑模式（`isDynamicCompact`）下，全局行高严禁使用松散的 `leading-relaxed`，一律收窄为 `leading-tight` / `leading-snug`，行间距压缩为 `space-y-1.5` ~ `space-y-2`，外边距从 `p-4.5` 压缩至 `p-2.5`，确保内容区域即使被裁切也能完整阅读。
 
 ### 3.4 溢出排版与悬停跑马灯 (Hover-Scroll) 规范
@@ -165,7 +167,7 @@ $$\text{Inner Radius} = \text{Outer Radius} - \text{Padding}$$
 |            【超窄药丸点击保障】即使药丸拉至极小 (<280px)，搜索图标始终保留 28px   |
 |                                独立胶囊靶心，点击聚焦瞬间平滑展开为输入框；      |
 |            【左侧收缩规避】左侧红绿灯感应区收缩至边缘 16px，决不遮挡右侧搜索框；   |
-|            搭配悬停滚动跑马灯 (Hover-Scroll Marquee：默认静止、悬停滚动、移出平滑复位) 与悬停扩展热区    |
+|            搭配连续无限循环跑马灯 (Continuous Marquee) 与悬停扩展热区    |
 +-------------------------------------------------------------------------+
 ```
 
@@ -173,15 +175,12 @@ $$\text{Inner Radius} = \text{Outer Radius} - \text{Padding}$$
 
 ## 6. 核心组件标准实现规约 (Component Standards)
 
-### 6.1 悬浮卡片外框 (`FloatingTranslatorCard`) 与交互优先级体系
-- **全边缘 8 向拉伸把手与四角优先级**：必须支持全边缘 8 向拉伸把手（`resize-handle`）；四角（NW、NE、SW、SE）缩放手柄层级提升为 `z-50` 并扩大物理触控热区至 24px×24px（`w-6 h-6`），确保左上角与右上角缩放把手绝对优先于标题栏拖拽；
-- **左上与右上工具交互区绝对优先准则**：
-  - 顶栏左上区域（红绿灯、关闭、清空、药丸收起、刷新）与右上区域（截图、固定置顶、字号浮层、偏好设置）必须包裹于 `.top-left-zone` 与 `.top-right-zone` 并设为 `relative z-40`，所有交互按钮自带 `onMouseDown={(e) => e.stopPropagation()}`；
-  - 容器拖拽入口 `handleMouseDown` 实施几何坐标保底保护：左边缘 ≤ 68px 区域与右边缘 ≤ 95~145px 区域严禁启动拖动，即使点击在按钮间距或内边距上也绝不发生容器位移；
-- **拖拽运动位移阈值与微抖动过滤**：
-  - 采用 7px 位移判定阈值（`Math.hypot(dx, dy) >= 7`），原位点击或触控微颤绝不触发 `isDragging` 拖拽状态与阻尼微缩，保障点击精准无位移；
-- **拖拽激活视觉反馈**：拖拽激活状态下应用 `scale-[1.018]` 阻尼放大，投影从 `shadow-2xl` 渐变为 `shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85)]`，强调景深抬升；
-- **极简模式与药丸模式同步防护**：极简模式的左上与右上角感知传感器（Sensor）及展开胶囊、药丸模式左右悬停热区必须统一应用 `.no-drag` 与冒泡切断。
+### 6.1 悬浮卡片外框 (`FloatingTranslatorCard`)
+- 必须支持全边缘 8 向拉伸把手（`resize-handle`），把手在 Hover 时带有微弱高光；
+- 缩放手柄层级限制为 `z-20` 并位于四角最外沿，顶栏所有按钮及控制胶囊强制定义为 `relative z-30` 并配备 `e.stopPropagation()`，彻底杜绝拉手对按钮点击的拦截；
+- 拖拽运动位移阈值：必须应用 4px 位移判断（`Math.hypot(dx, dy) >= 4`），原位点击绝不触发 `isDragging` 拖拽状态与阻尼微缩，保障点击精准无延迟；
+- 拖拽激活状态下应用 `scale-[1.018]` 阻尼放大，投影从 `shadow-2xl` 渐变为 `shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85)]`，强调景深抬升；
+- 卡片关闭与拖拽判定区必须排除内部 `button`、`input` 与 `.no-drag` 元素，防止误触。
 
 ### 6.2 语音与复制按钮
 - 统一采用圆形微透触控靶标：`p-1 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors`；
@@ -195,25 +194,6 @@ $$\text{Inner Radius} = \text{Outer Radius} - \text{Padding}$$
 - 截图后卡片位置必须**像素级精确锚定在用户所画截图矩形坐标 $(X, Y, W, H)$** 上；
 - 背景使用高透明毛玻璃（`bg-slate-950/80 backdrop-blur-2xl`），中英双语严密保持逐行对齐，原行原段原貌呈现。
 
-### 6.5 生词本双语发音靶标 (Bilingual Pronunciation Targets)
-- 生词本（`HistoryDrawer` Favorites Tab）每条目提供**原文**与**译文**两个独立发音触控靶标；
-- 原文靶标：`Volume2` 图标 + `hover:text-blue-500`，按 `sourceLang` 朗读；译文靶标：`Volume2` 图标 + `text-emerald-500/70` + `hover:text-emerald-500`，按 `targetLang` 朗读；
-- 统一采用圆形微透触控靶标尺寸（`p-1 rounded-md w-3.5 h-3.5`），与 6.2 语音按钮规范一致，禁止放大到 `w-5` 以上破坏工具栏网格对齐；
-- 历史 Tab 保持单语发音布局不变，避免过度装饰。
-
-### 6.6 数据管理按钮组 (Data Management Buttons)
-- 历史抽屉顶栏与偏好设置「数据与备份管理」区块的功能按钮统一为**紧凑胶囊按钮**：`px-2.5 py-1.5 rounded-lg text-[10px] font-medium`；
-- 语义色彩 Token 严格对齐 2.3：导出历史（蓝 `bg-blue-600`）、导出生词本（琥珀 `bg-amber-600`）、复制 JSON（石墨 `bg-slate-700`）、导入（翡翠 `bg-emerald-600`）；
-- 图标与文字间距 `gap-1`，图标尺寸严格 `w-3 h-3`（12px）或 `w-3.5 h-3.5`（14px）；
-- 文件选择器使用 `hidden` 输入 + 按钮触发，保持界面纯净。
-
-### 6.7 字体调节面板与滑条 (Font Size Slider Panel)
-- 字体面板为**全局浮层**：React Portal 渲染至 `document.body`，`position: fixed`，`z-index: 999999`，按触发按钮视口坐标定位（右对齐按钮下方 8px，自动避让视口边缘），绝不进入卡片层叠上下文，杜绝遮挡；
-- 滑条 `.font-range`：6px 高圆角渐变轨道（已选段 `#3b82f6` 蓝 + 未选段 `rgba(255,255,255,0.12)`），`--fill` CSS 变量驱动填充比例；白色圆形手柄 16px、3px 蓝色描边 + 光晕，hover 缩放 1.15 + 6px 光圈；
-- 加减步进按钮：`p-1.5 rounded-lg bg-white/5 border-white/10`，`active:scale-90` 按压反馈；当前值 `text-xl font-mono tabular-nums text-blue-400`；
-- 直接输入框 `w-16` 等宽数字，失焦自动钳制 60~150；预设 4 档（80/92/100/115）选中态 `bg-blue-500/20 text-blue-300 border-blue-400/50`；
-- 入场动画 `font-panel-in`：fade + `translateY(-6px) scale(0.95)` → 归位，180ms `cubic-bezier(0.16, 1, 0.3, 1)`，锚点 `top right`。
-
 ---
 
 ## 7. 动效、物理曲线与交互时序 (Motion & Micro-interactions)
@@ -221,12 +201,10 @@ $$\text{Inner Radius} = \text{Outer Radius} - \text{Padding}$$
 | 场景 | 动画类型 / 曲线 | 时长 | 视觉规范 |
 | :--- | :--- | :--- | :--- |
 | **卡片尺寸自适应过渡** | `transition-[width,height,transform,box-shadow]` | 250ms ~ 300ms `ease-out` | 拖拽拉伸时不加尺寸延迟，仅模式切换时平滑插值 |
-| **药丸单行悬停跑马灯** | JS `requestAnimationFrame` 驱动 `transform` | 动态时长 (10s ~ 36s 线性) | 默认静止，悬停时滚动，移出以 `cubic-bezier(0.16,1,0.3,1)` 0.45s 平滑复位至 0 位 |
+| **药丸单行无限跑马灯** | `@keyframes marquee-scroll` | 动态时长 (10s ~ 36s 线性) | 悬停时立刻暂停（`animation-play-state: paused`） |
 | **极简卡片悬停滚动** | `HoverScrollText` CSS 平移 | 速度 `35px/s` | 离开时平滑复位至 0 位 |
 | **加载状态脉冲光条** | `linear-loading-slide` | 1.25s `cubic-bezier(0.4, 0, 0.2, 1)` | 极细（1.5px）翡翠绿/电光蓝高光在顶部分隔线滑过 |
 | **Tooltip 悬浮淡入** | `fade-in zoom-in-95` | 150ms | 带有防抖时钟，移出 200ms 后平滑淡出 |
-| **字体面板入场** | `font-panel-in`（fade + 上移 6px + scale 0.95→1） | 180ms `cubic-bezier(0.16, 1, 0.3, 1)` | 锚点右上，Portal 全局浮层 |
-| **滑条手柄 hover / active** | `transform: scale(1.15 / 1.05)` + 光圈扩散 | 150ms `ease` | 轨道渐变随 `--fill` 平滑过渡 |
 
 ---
 
