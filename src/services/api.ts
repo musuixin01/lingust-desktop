@@ -15,7 +15,13 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(url, {
+  // If running via file:// protocol in packaged Electron, route relative /api requests to local Express server
+  let targetUrl = url;
+  if (typeof window !== 'undefined' && window.location?.protocol === 'file:' && url.startsWith('/api/')) {
+    targetUrl = `http://127.0.0.1:3000${url}`;
+  }
+
+  const response = await fetch(targetUrl, {
     ...options,
     headers,
   });

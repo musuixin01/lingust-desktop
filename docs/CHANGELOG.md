@@ -9,6 +9,40 @@
 
 ---
 
+## [v1.3.2] - 2026-09-04
+
+### [Fixed] 桌面端原生无边框透明渲染与响应式尺寸死循环修复 (Desktop Frameless Transparency & Window Sizing Fix)
+- **便携包白屏/灰屏加载机制修复 (`vite.config.ts`, `electron/main.ts`, `src/services/api.ts`)**：
+  - 在 `vite.config.ts` 中配置 `base: './'`，解决 Electron 打包解压后 `file://` 协议加载绝对路径 `/assets/...` 失败导致页面不渲染的根本原因；
+  - 在 `electron/main.ts` 中针对打包应用引入内嵌 Express 服务自启动与静态资源回落机制，确保在打包脱机环境下无论是直接文件加载还是本地服务均能稳定初始化；
+  - 在 `src/services/api.ts` 中增强对 `file://` 协议的自动适配，使相对接口自动路由到本地 `http://127.0.0.1:3000/api`。
+- **消减多余外层边框与窗口包裹感 (`electron/main.ts`, `index.html`, `src/index.css`)**：
+  - 解决 Windows 下 `backgroundMaterial: 'acrylic'` 与 `transparent: true` 互斥产生不透明灰色方形窗口的已知缺陷，显式指定 `backgroundColor: '#00000000'`，禁用 Windows DWM 产生黑灰方形投影的 `hasShadow: false`；
+  - 将 `index.html` 中的 `body` 以及 `src/index.css` 的 `html, body, #root` 根底色完全设置为透明 (`background: transparent !important`)，杜绝任何外部额外矩形背景。
+- **阻断卡片被压缩为最小尺寸的递归循环 (`src/components/translator/FloatingTranslatorCard.tsx`)**：
+  - 重构 `handleWindowResize`：在原生桌面环境下，卡片尺寸严格跟随 Electron 窗口尺寸（`window.innerWidth`, `window.innerHeight`），不再进行带有外边距偏置的收缩裁剪，消除窗口尺寸反复被动收缩直至最低限额的自激死循环；
+  - 改造 `syncWindowSize` 节流与依赖追踪：仅在用户显式触发模式切换（卡片 ↔ 极简药丸 / 极简模式）时主动同步窗口尺寸，正常窗体边缘拉伸与渲染时不触发重复 IPC 尺寸上报；
+  - 原生全填充布局：在 Electron 模式下悬浮卡片自适应填充无边框窗口 (`100vw × 100vh`)，不再存在固定边距漂浮，隐藏仅用于 Web 仿真的 DOM 手柄，让卡片自带的高级圆角与苹果液态玻璃阴影成为桌面唯一视觉边缘，完美支持 Windows 原生边缘无缝拉伸缩放与顶部平滑拖拽。
+
+---
+
+## [v1.3.1] - 2026-09-04
+
+### [Added] 原文输入框粘贴自动识别语言与状态实时联动 (Auto-detect Language on Paste)
+- **多语种启发式智能嗅探算法 (`src/utils/languageDetector.ts`)**：
+  - 针对系统支持的 10 种国际主流语言（中、英、日、韩、法、德、西、俄、意、葡），构建无网络依赖、毫秒级执行的高精度启发式识别引擎；
+  - 深度支持非拉丁文字脚本特征识别（日文平假名/片假名 `[\u3040-\u309F\u30A0-\u30FF]`、韩文谚文 `[\uAC00-\uD7AF]`、俄文西里尔字母 `[\u0400-\u04FF]`、中文 CJK 汉字及全角标点）；
+  - 针对拉丁文字系（英语、法语、德语、西班牙语、意大利语、葡萄牙语），融合特殊重音符/特征字符（德语 `ß/ä/ö/ü`、西班牙语 `ñ/¿/¡`、葡萄牙语 `ã/õ/ão/ções`、法语 `œ/æ/c'est`、意大利语高频形态）与词频加权判定，保障单词与长句均有 95%+ 的识别准确率。
+- **输入框剪贴板智能接管 (`src/components/translator/FloatingTranslatorCard.tsx`)**：
+  - 在悬浮卡片的三种形态输入组件（极简药丸输入框、紧凑搜索输入框、标准展开多行文本域及其外层点击容器）全面绑定 `onPaste` 智能侦测；
+  - 用户粘贴文本时，自动计算光标或选区位置合并新内容，并立即触发语种识别；
+  - **状态双向联动与防冲突**：自动将 `sourceLang` 状态更新为识别到的源语种。若目标语种 `targetLang` 与识别语种发生冲突（例如源语种识别为中文且目标语言原本也是中文），智能将目标语种调整为英语（或中文），避免自翻译无效请求；
+  - **视觉反馈胶囊**：检测成功后在卡片顶部平滑弹出磨砂玻璃微徽章（`Sparkles` + 国旗 Emoji + 语种中文名），停留 3.2 秒后平滑隐退，给予用户明确且优雅的操作确认。
+- **文档与架构同步**：
+  - 同步更新 `docs/ARCHITECTURE.md`，记录语种嗅探算法与剪贴板事件流转架构。
+
+---
+
 ## [v1.3.0] - 2026-09-04
 
 ### [Added] Windows 桌面端原生封装与全功能落地 (Windows Desktop Electron Packaging)

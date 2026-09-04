@@ -32,29 +32,28 @@ function createMainWindow() {
   const iconPath = path.join(app.getAppPath(), 'public', 'icon.png');
 
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 620,
+    width: 390,
+    height: 520,
     minWidth: 260,
     minHeight: 46,
     frame: false, // Frameless window
     transparent: true, // Transparent for Apple/Windows Liquid Glass & rounded corners
-    hasShadow: true,
+    backgroundColor: '#00000000', // Explicit transparent background to eliminate opaque grey box
+    hasShadow: false, // Prevent Windows DWM from rendering a square grey/black box shadow
     show: false,
     resizable: true,
     alwaysOnTop: isAlwaysOnTopState,
     skipTaskbar: false,
     icon: iconPath,
-    // Windows 11 Native Acrylic & Mica Effects + Rounded Corners
-    backgroundMaterial: 'acrylic', // 'acrylic' | 'mica'
     roundedCorners: true,
     // macOS Native Frosted Glass Vibrancy
-    vibrancy: 'under-window',
+    vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
     visualEffectState: 'active',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: true,
+      webSecurity: false, // Allow local file loading with assets
     },
   });
 
@@ -304,8 +303,22 @@ function setupIpcHandlers() {
   });
 }
 
+// Embedded Express server starter for packaged desktop client
+function startEmbeddedServerIfNeeded() {
+  if (app.isPackaged) {
+    try {
+      const serverPath = path.join(app.getAppPath(), 'dist', 'server.cjs');
+      require(serverPath);
+      console.log('[Electron] Embedded server started from', serverPath);
+    } catch (e) {
+      console.warn('[Electron] Could not start embedded server:', e);
+    }
+  }
+}
+
 // App lifecycle
 app.whenReady().then(async () => {
+  startEmbeddedServerIfNeeded();
   setupIpcHandlers();
   createMainWindow();
   createTray();

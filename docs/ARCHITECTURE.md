@@ -57,10 +57,22 @@
 - **主进程与渲染进程解耦设计**：
   - 主进程 (`/electron/main.ts`)：专责原生窗口生命周期、系统托盘（System Tray）、全局快捷键注册（`Alt+Space`, `Alt+S`）、以及通过 `desktopCapturer` 调用底层显示器捕获；
   - 预加载安全桥 (`/electron/preload.ts`)：基于 Electron `contextBridge` 与严格沙箱规范向渲染层注入强类型 `window.electronAPI`；
-  - 渲染进程 (`/src/`)：自适应检测是否运行于原生环境（`isElectron()`），若为原生环境则剔除仿真壁纸并激活窗口穿透、原生拖拽区（`-webkit-app-region: drag`）与窗口尺寸双向同步。
-- **Windows 11 Acrylic & macOS Liquid Glass 原生材质**：
-  - Windows 端：配置 `transparent: true` 与 `backgroundMaterial: 'acrylic'`，融合 Win 11 硬件加速抗锯齿圆角与纯粹亚克力半透明材质；
-  - macOS 端：配置 `vibrancy: 'under-window'`，辅以视网膜级高饱和 Liquid Glass 滤镜（`backdrop-filter: blur(32px) saturate(190%)`）。
+  - 渲染进程 (`/src/`)：自适应检测是否运行于原生环境（`isElectron()`），若为原生环境则剔除仿真壁纸并激活窗口穿透、原生拖拽区（`-webkit-app-region: drag`）与窗口尺寸 1:1 双向同步；
+  - 脱机与内嵌服务容灾：在打包或便携版中，主进程自启动内嵌 Express 服务并支持 `file://` 与 `localhost:3000` 端口双向回落，`vite.config.ts` 采用 `base: './'` 相对路径彻底杜绝离线灰白屏。
+- **无冲突原生透明与苹果液态玻璃材质 (True Transparent Frameless & Liquid Glass)**：
+  - 规避 Windows 平台 `backgroundMaterial: 'acrylic'` 与 `transparent: true` 互斥产生黑灰方形底框的问题，显式设定 `backgroundColor: '#00000000'`，关闭 OS 窗体黑灰硬边阴影（`hasShadow: false`）；
+  - 全局根容器（`html, body, #root`）重置为纯透明，卡片主体直接填充无边框窗口（`100vw × 100vh`），卡片圆角（32px）和液态玻璃模糊滤镜直接呈现在桌面上；
+  - 彻底解耦窗口被动缩放递归，窗体拉伸由 Windows/macOS 原生边框驱动，仅在模式切换（卡片 ↔ 药丸）时主动通知主进程重设窗口大小，彻底消除启动后卡片被持续压缩至最小形态的自激死循环。
+
+### 2.5 智能语种嗅探与剪贴板自动识别联动 (Heuristic Language Detection on Paste)
+- **非拉丁字符与专有文字集断言**：针对日文平假名/片假名（`[\u3040-\u309F\u30A0-\u30FF]`）、韩文谚文（`[\uAC00-\uD7AF]`）、俄文西里尔字母（`[\u0400-\u04FF]`）、中文 CJK 汉字体系，结合字符集排他性进行零延迟判定；
+- **拉丁语族（EN/FR/DE/ES/IT/PT）字符与词频加权**：
+  - 提取特定单语言标识（如德语 `ß`、西班牙语 `ñ/¿/¡`、葡萄牙语 `ã/õ/ão`、法语缩合与特殊音标等）；
+  - 结合常见高频核心介词、连词及系统离线词库进行加权打分匹配，确保短语及句子识别准确率；
+- **组件剪贴板事件流接管**：
+  - 在 `FloatingTranslatorCard` 的输入框（极简胶囊、紧凑搜索栏、多行文本域）监听 `onPaste`；
+  - 捕获文本后即时触发语种识别，自动同步更新 `sourceLang` 状态；
+  - 遇到源与目标语言冲突时自动反转/调整目标语种，同时触发轻量 Toast 反馈胶囊与即时翻译调度。
 
 ## 3. 跨平台构建与发布流水线 (Build Pipeline)
 
