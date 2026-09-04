@@ -18,7 +18,10 @@
   - 在 `electron/main.ts` 中强化容灾兜底：当网络端口尚未就绪时，自动降级挂载本地静态文件，同时后台自启内嵌 Express 服务并为 `server.ts` 引入 `EADDRINUSE` 端口智能重用，避免端口冲突闪退；
   - 在 `vite.config.ts` 中配置 `base: './'` 相对路径，彻底解决便携包在 `file://` 协议下绝对路径资源解析失败引起的白屏/灰屏。
 - **消减多余外层边框与窗口包裹感 (`electron/main.ts`, `index.html`, `src/index.css`)**：
-  - 解决 Windows 下 `backgroundMaterial: 'acrylic'` 与 `transparent: true` 互斥产生不透明灰色方形窗口的已知缺陷，显式指定 `backgroundColor: '#00000000'`，禁用 Windows DWM 产生黑灰方形投影的 `hasShadow: false`；
+  - 深入排查并彻底解决 Windows DWM 强制渲染外层原生调整框问题：显式配置 `thickFrame: false`，从操作系统底层移除 `WS_THICKFRAME` 原生缩放外框与窗体边缘白/灰色投影；
+  - 显式配置 `roundedCorners: false`，消除 Windows 11 DWM 在失焦或渲染时在外层额外绘制的系统圆角外框；
+  - 添加 `app.commandLine.appendSwitch('enable-transparent-visuals')`，强化 Windows 底层 Alpha 透明通道合成，消除 GPU 光栅化导致的偶发性灰黑底板；
+  - 显式指定 `backgroundColor: '#00000000'`，禁用 Windows DWM 产生黑灰方形投影的 `hasShadow: false`；
   - 将 `index.html` 中的 `body` 以及 `src/index.css` 的 `html, body, #root` 根底色完全设置为透明 (`background: transparent !important`)，杜绝任何外部额外矩形背景。
 - **阻断卡片被压缩为最小尺寸的递归循环 (`src/components/translator/FloatingTranslatorCard.tsx`)**：
   - 重构 `handleWindowResize`：在原生桌面环境下，卡片尺寸严格跟随 Electron 窗口尺寸（`window.innerWidth`, `window.innerHeight`），不再进行带有外边距偏置的收缩裁剪，消除窗口尺寸反复被动收缩直至最低限额的自激死循环；

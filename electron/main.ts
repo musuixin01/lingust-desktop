@@ -2,6 +2,11 @@ import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, d
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Hardware acceleration & Windows transparency configuration
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('enable-transparent-visuals');
+}
+
 const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 const PORT = process.env.PORT || 3000;
 
@@ -36,8 +41,10 @@ function createMainWindow() {
     height: 520,
     minWidth: 260,
     minHeight: 46,
-    frame: false, // Frameless window
-    transparent: true, // Transparent for Apple/Windows Liquid Glass & rounded corners
+    frame: false, // Frameless window: removes OS standard titlebar and chrome
+    transparent: true, // Transparent window for liquid glass design
+    thickFrame: false, // CRITICAL FOR WINDOWS: disables WS_THICKFRAME to completely remove outer OS resize border & wrapper
+    roundedCorners: false, // CRITICAL FOR WINDOWS 11: prevents DWM from drawing an external system window border
     backgroundColor: '#00000000', // Explicit transparent background to eliminate opaque grey box
     hasShadow: false, // Prevent Windows DWM from rendering a square grey/black box shadow
     show: false,
@@ -45,7 +52,6 @@ function createMainWindow() {
     alwaysOnTop: isAlwaysOnTopState,
     skipTaskbar: false,
     icon: iconPath,
-    roundedCorners: true,
     // macOS Native Frosted Glass Vibrancy
     vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
     visualEffectState: 'active',
