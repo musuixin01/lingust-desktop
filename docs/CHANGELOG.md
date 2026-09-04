@@ -30,6 +30,17 @@
   - 系统设置窗中新增第 6 节“🖥️ 桌面端与原生架构配置”，展示运行状态徽章、系统全局热键与一键打包命令清单；
   - 增强桌面环境工作区模拟器：支持「双语阅读」、「VS Code 编程开发」与「纯净桌面悬浮」三大沉浸场景自由切换，并内置可视化「💻 本地桌面端运行指南」一键复制运行与打包指令。
 
+### [Added] Windows 独立客户端预打包与一键直接下载 (Pre-built Windows Client & Direct Download)
+- **Windows x64 独立客户端完成全量封包构建**：
+  - 在云端完成 Windows x64 二进制与全量依赖（Chromium + Electron + ASAR + DLL 动态链接库）编译，输出完整绿色便携解包目录 `release/win-unpacked`（含 `Linguist.exe` 235MB）及高压缩包 `release/Linguist-Windows-v1.3.0-x64.zip`（197MB）；
+  - 新增后端下载路由 `/api/download/windows` 与状态查询接口 `/api/download/status`，支持浏览器直接断点续传下载；
+  - 界面顶栏右侧新增「📥 下载 Windows 打包版 (197MB)」高亮按钮，并在桌面端指南与系统设置第 6 节中均集成一键直接下载入口，用户无需安装任何命令行或 Node.js 环境，解压后双击 `Linguist.exe` 即可直接开箱运行。
+
+### [Changed] Git 仓库初始化与 GitHub 导出优化 (Git Init & .gitignore Hardening)
+- **.gitignore 规避 GitHub 100MB 限制**：
+  - 将 `release/` 及 `dist-electron/` 纳入 `.gitignore`，防止已生成的 197MB Windows 客户端可执行程序超出 GitHub 100MB 单文件推送上限；
+  - 完成本地 Git 仓库全量初始化与首版本规范提交（`main` 分支），确保在 AI Studio 中使用「Export to GitHub」可秒级一键推送到用户的个人 GitHub 仓库。
+
 ### [Added] 跨平台编译打包体系与 macOS 预设 (Windows & macOS Build Pipeline)
 - **多平台构建配置 (`electron-builder.json`)**：
   - Windows：支持输出 NSIS 安装包与免安装绿色便携版（Portable），配置 256x256 高清 ICO 图标与一键静默升级参数；

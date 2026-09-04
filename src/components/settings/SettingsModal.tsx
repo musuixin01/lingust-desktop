@@ -24,6 +24,7 @@ import {
   Layers,
   Pin,
   Command,
+  Download,
 } from 'lucide-react';
 import { AppSettings, TranslationEngine, EngineApiKeys } from '../../types';
 import { isElectron, getPlatform, setAlwaysOnTop as electronSetAlwaysOnTop } from '../../utils/electron';
@@ -747,6 +748,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 {settings.alwaysOnTop ? '已置顶' : '未置顶'}
               </button>
+            </div>
+
+            {/* Ready-to-download Windows Client */}
+            <div className="p-3 rounded-xl bg-linear-to-r from-emerald-500/15 via-teal-500/10 to-blue-500/15 border border-emerald-500/30 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Download className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-xs text-slate-800 dark:text-white flex items-center gap-1.5">
+                      <span>Windows 免安装绿色版已就绪</span>
+                      <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[9px] border border-emerald-500/30">197 MB</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      解压后直接双击 Linguist.exe 即可运行，无需命令行
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="/api/download/windows"
+                  download="Linguist-Windows-v1.3.0-x64.zip"
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>下载 (.zip)</span>
+                </a>
+              </div>
             </div>
 
             {/* Build Commands Cheat Sheet */}

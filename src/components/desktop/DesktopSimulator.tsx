@@ -22,6 +22,7 @@ import {
   X,
   Layers,
   Sparkle,
+  Download,
 } from 'lucide-react';
 import { AppSettings } from '../../types';
 
@@ -108,20 +109,30 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
 
         {/* Right status bar */}
         <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-300">
+          <a
+            href="/api/download/windows"
+            download="Linguist-Windows-v1.3.0-x64.zip"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-[11px] shadow-sm transition-all cursor-pointer"
+            title="下载已为您在云端完整打包好的 Windows 绿色便携版 (解压双击即可运行)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>📥 下载 Windows 打包版 (197MB)</span>
+          </a>
+
           <button
             type="button"
             onClick={() => setShowDesktopGuide(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 transition-all cursor-pointer font-medium text-[11px]"
-            title="查看如何在您本地 Windows/Mac 电脑上启动原生桌面客户端"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-400/30 transition-all cursor-pointer font-medium text-[11px]"
+            title="查看桌面端运行与打包指南"
           >
-            <Laptop className="w-3.5 h-3.5 text-emerald-400" />
-            <span>💻 本地桌面端运行</span>
+            <Laptop className="w-3.5 h-3.5 text-blue-400" />
+            <span>桌面端指南</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenSnipper}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-[11px] text-blue-300 border border-blue-400/30 transition-all cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[11px] text-slate-200 border border-white/20 transition-all cursor-pointer"
             title="点击启动截图/框选翻译"
           >
             <Crop className="w-3 h-3 text-blue-400 animate-pulse" />
@@ -514,6 +525,38 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
+              {/* Ready-to-download Windows Client Card */}
+              <div className="p-3.5 rounded-xl bg-linear-to-r from-emerald-950/80 via-slate-900 to-teal-950/80 border border-emerald-500/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Download className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <span>已为您在云端打包好 Windows 客户端！</span>
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9px] border border-emerald-500/30">197 MB</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        免安装绿色便携版，内含完整 Chromium 内核、亚克力毛玻璃窗口与快捷键支持。
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href="/api/download/windows"
+                    download="Linguist-Windows-v1.3.0-x64.zip"
+                    className="px-3.5 py-1.5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>立即下载 Windows 包 (.zip)</span>
+                  </a>
+                </div>
+                <div className="text-[11px] text-emerald-200/90 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span><strong>使用方法：</strong>点击上方按钮下载 ZIP 压缩包，解压后双击运行 <strong>Linguist.exe</strong> 即可开箱即用！无需配置任何 Node.js 命令行环境。</span>
+                </div>
+              </div>
+
               <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 space-y-1">
                 <div className="font-semibold flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-blue-400" />
