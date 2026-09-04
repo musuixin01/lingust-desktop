@@ -29,9 +29,6 @@ Linguist 是一款面向现代化桌面场景的高端生产力翻译与词典�
 | **主悬浮卡片背景** (`bg-white/10`) | `rgba(255, 255, 255, 0.10)` | 核心悬浮卡片、截图原地卡片 |
 | **次级容器背景** (`bg-white/5`) | `rgba(255, 255, 255, 0.05)` | 语言选择胶囊、词性释义块、输入框外壳 |
 | **深色悬浮抽屉** (`bg-slate-900/95` 或 `bg-[#0c0d14]`) | `rgba(12, 13, 20, 0.95)` | 设置模态弹窗、生词本抽屉、悬停多行展开浮层 |
-| **苹果风格超质感液体玻璃** (`.apple-liquid-glass`) | `blur(32px) saturate(190%) contrast(104%)`, 双层内外阴影与反光 | 悬浮卡片在桌面端或大尺寸下的液体透光质感 |
-| **苹果风格胶囊药丸** (`.apple-liquid-pill`) | `blur(28px) saturate(190%)`, 360° 全圆角胶囊与微光透射 | 最小化悬浮药丸形态 |
-| **Windows 11 原生亚克力材质** (`.windows-acrylic-card`) | `rgba(18, 20, 32, 0.78)` + `blur(36px) saturate(160%)` | Windows 11 Acrylic / Mica 桌面原生融合 |
 | **模糊滤镜强度** (`backdrop-blur-3xl`) | `blur(40px)` 或 `-webkit-backdrop-filter: blur(40px)` | 悬浮卡片高斯模糊核心参数 |
 | **微光外边框** (`border-white/20`) | `1px solid rgba(255, 255, 255, 0.20)` | 静止态卡片与容器边界 |
 | **激活高亮边框** (`border-white/35`) | `1px solid rgba(255, 255, 255, 0.35)` | 拖拽中、获取焦点中、激活选态 |

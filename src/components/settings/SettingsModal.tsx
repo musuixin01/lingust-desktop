@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Sliders,
@@ -19,16 +19,8 @@ import {
   RotateCw,
   Cpu,
   Type,
-  Laptop,
-  Terminal,
-  Layers,
-  Pin,
-  Command,
-  Download,
 } from 'lucide-react';
 import { AppSettings, TranslationEngine, EngineApiKeys } from '../../types';
-import { isElectron, getPlatform, setAlwaysOnTop as electronSetAlwaysOnTop } from '../../utils/electron';
-import { DownloadModal } from '../common/DownloadModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -51,7 +43,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showDeeplKey, setShowDeeplKey] = useState(false);
   const [showYoudaoSecret, setShowYoudaoSecret] = useState(false);
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Test connection state
   const [testingEngine, setTestingEngine] = useState<TranslationEngine | null>(null);
@@ -659,146 +650,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Section 6: 桌面客户端与技术架构 (Windows 亚克力/云母 & macOS 苹果磨砂玻璃) */}
-          <div className="p-3.5 rounded-xl bg-black/5 dark:bg-white/5 space-y-3 border border-blue-500/20">
-            <div className="flex items-center justify-between">
-              <div className="font-semibold flex items-center gap-1.5 text-slate-900 dark:text-white">
-                <Laptop className="w-4 h-4 text-blue-500" />
-                <span>桌面客户端架构与原生效果</span>
-              </div>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${
-                  isElectron()
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${isElectron() ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
-                {isElectron()
-                  ? `桌面端运行中 (${getPlatform() === 'win32' ? 'Windows Acrylic' : getPlatform() === 'darwin' ? 'macOS Liquid Glass' : 'Linux'})`
-                  : 'Web 仿真预览 (可随时打包桌面端)'}
-              </span>
-            </div>
-
-            {/* Architecture Highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-              <div className="p-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 space-y-1">
-                <div className="flex items-center gap-1 font-medium text-slate-800 dark:text-slate-200">
-                  <Layers className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Windows 11 亚克力与硬件圆角</span>
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
-                  Electron 34+ 深度集成 <code className="text-blue-400 font-mono">acrylic / mica</code> 原生窗口材质与抗锯齿圆角，透明悬浮于真实系统桌面。
-                </p>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 space-y-1">
-                <div className="flex items-center gap-1 font-medium text-slate-800 dark:text-slate-200">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-                  <span>苹果风格超质感液体玻璃</span>
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
-                  高饱和度 <code className="text-pink-400 font-mono">backdrop-filter (190%)</code> 配合微高光晶体边缘与 macOS Vibrancy，两端均享视网膜级质感。
-                </p>
-              </div>
-            </div>
-
-            {/* Global Shortcuts and System Tray Info */}
-            <div className="p-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 space-y-2 text-[11px]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
-                  <Command className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>全局快捷键与系统托盘</span>
-                </div>
-                <span className="text-[9px] text-slate-400 font-mono">开箱即用</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="flex items-center justify-between p-1.5 rounded bg-black/5 dark:bg-black/30">
-                  <span className="text-slate-400">呼出 / 隐藏卡片</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-blue-300 font-mono font-semibold">Alt + Space</kbd>
-                </div>
-                <div className="flex items-center justify-between p-1.5 rounded bg-black/5 dark:bg-black/30">
-                  <span className="text-slate-400">全局截屏 OCR 翻译</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-pink-300 font-mono font-semibold">Alt + S</kbd>
-                </div>
-              </div>
-            </div>
-
-            {/* Always On Top Toggle */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="space-y-0.5">
-                <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Pin className="w-3.5 h-3.5 text-blue-500" />
-                  <span>窗口始终置顶 (Always on Top)</span>
-                </div>
-                <div className="text-[10px] text-slate-400">
-                  悬浮在其他办公软件、IDE 或浏览器窗口上方
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextState = !settings.alwaysOnTop;
-                  onUpdateSettings({ alwaysOnTop: nextState });
-                  electronSetAlwaysOnTop(nextState);
-                }}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                  settings.alwaysOnTop
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-black/5 dark:bg-white/5 text-slate-500 border-black/10 dark:border-white/10'
-                }`}
-              >
-                {settings.alwaysOnTop ? '已置顶' : '未置顶'}
-              </button>
-            </div>
-
-            {/* Ready-to-download Windows Client */}
-            <div className="p-3 rounded-xl bg-linear-to-r from-emerald-500/15 via-teal-500/10 to-blue-500/15 border border-emerald-500/30 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Download className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-xs text-slate-800 dark:text-white flex items-center gap-1.5">
-                      <span>Windows 免安装绿色版已就绪</span>
-                      <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[9px] border border-emerald-500/30">197 MB</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      解压后直接双击 Linguist.exe 即可运行，无需命令行
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDownloadModal(true)}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>下载 (.zip)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Build Commands Cheat Sheet */}
-            <div className="p-2 rounded-lg bg-slate-900/90 text-slate-300 font-mono text-[10px] space-y-1">
-              <div className="flex items-center gap-1.5 text-blue-400 font-semibold mb-1">
-                <Terminal className="w-3 h-3" />
-                <span>桌面端一键编译与打包脚本：</span>
-              </div>
-              <div className="text-slate-400">
-                <span className="text-emerald-400">Windows 客户端构建：</span> npm run electron:build:win
-              </div>
-              <div className="text-slate-400">
-                <span className="text-pink-400">macOS 客户端构建：</span> npm run electron:build:mac
-              </div>
-              <div className="text-slate-400">
-                <span className="text-amber-400">本地桌面实时调试：</span> npm run electron:dev
-              </div>
-            </div>
-          </div>
-
-          {/* Section 7: 桌面壁纸风格 */}
+          {/* Section 6: 桌面壁纸风格 */}
           <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 space-y-2">
             <div className="font-semibold flex items-center gap-1.5">
               <Monitor className="w-3.5 h-3.5 text-blue-500" />
@@ -844,12 +696,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Chunked Download Modal */}
-      <DownloadModal
-        isOpen={showDownloadModal}
-        onClose={() => setShowDownloadModal(false)}
-      />
     </div>
   );
 };

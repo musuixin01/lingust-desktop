@@ -12,12 +12,6 @@ import {
 } from './components';
 import { speakText } from './utils/speech';
 import { translateOffline } from './utils/offlineEngine';
-import {
-  isElectron,
-  getPlatform,
-  setAlwaysOnTop as electronSetAlwaysOnTop,
-  captureDesktopScreen,
-} from './utils/electron';
 
 // Default initial state matching the Frosted Glass design mock
 const INITIAL_RESULT: TranslationResult = {
@@ -520,36 +514,11 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('paste', handlePaste);
 
-    // Electron global shortcuts and tray event bridge
-    let unsubShortcut: (() => void) | undefined;
-    let unsubTray: (() => void) | undefined;
-
-    if (isElectron() && window.electronAPI) {
-      unsubShortcut = window.electronAPI.onShortcutTriggered((action) => {
-        if (action === 'screenshot') {
-          setIsSnipperOpen(true);
-        }
-      });
-
-      unsubTray = window.electronAPI.onTrayAction((action) => {
-        if (action === 'open-settings') {
-          setIsSettingsOpen(true);
-        } else if (action === 'open-history') {
-          setIsHistoryOpen(true);
-        }
-      });
-    }
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
-      if (unsubShortcut) unsubShortcut();
-      if (unsubTray) unsubTray();
     };
   }, [handleOcrCapture]);
-
-  const isNativeDesktop = isElectron();
-  const showSimulatedDesktop = !isNativeDesktop || Boolean(settings.simulatedDesktopInElectron);
 
   // Wallpaper backgrounds
   const wallpaperClass = {
@@ -561,20 +530,14 @@ export default function App() {
   }[settings.desktopWallpaper];
 
   return (
-    <div
-      className={`relative w-screen h-screen overflow-hidden ${
-        showSimulatedDesktop ? wallpaperClass : 'bg-transparent'
-      }`}
-    >
-      {/* Background simulated Desktop Workspace (仅在 Web 模式或开启仿真时展示) */}
-      {showSimulatedDesktop && (
-        <DesktopSimulator
-          settings={settings}
-          onQuickSelectWord={handleSelectWord}
-          onOpenSnipper={() => setIsSnipperOpen(true)}
-          isDark={settings.desktopWallpaper !== 'minimal-light'}
-        />
-      )}
+    <div className={`relative w-screen h-screen overflow-hidden ${wallpaperClass}`}>
+      {/* Background simulated macOS Desktop Workspace */}
+      <DesktopSimulator
+        settings={settings}
+        onQuickSelectWord={handleSelectWord}
+        onOpenSnipper={() => setIsSnipperOpen(true)}
+        isDark={settings.desktopWallpaper !== 'minimal-light'}
+      />
 
       {/* The Core Floating Desktop Translator Window */}
       <FloatingTranslatorCard

@@ -82,58 +82,11 @@ PORT=3000
 ```
 
 ### 3. 运行开发环境
-
-**Web 浏览器开发预览**：
 ```bash
 npm install
 npm run dev
 ```
 访问：`http://localhost:3000`
-
-**桌面端原生调试 (Windows / macOS)**：
-```bash
-npm run electron:dev
-```
-
----
-
-## 🖥️ 桌面客户端打包与发布 (Desktop Packaging)
-
-Linguist 采用现代化 Electron 34+ 跨平台无边框技术架构，深度支持 **Windows 11 原生亚克力（Acrylic/Mica）** 与 **macOS 原生超质感磨砂玻璃（Liquid Glass & Vibrancy）**。
-
-### 1. Windows 客户端构建 (NSIS 安装包 & 便携免安装版)
-```bash
-npm run electron:build:win
-```
-- **输出产物**：位于 `release/` 目录；
-- **安装包 (`.exe`)**：带有一键向导、桌面快捷方式、系统托盘常驻与开机启动支持；
-- **便携版 (`-portable.exe`)**：单文件免安装即开即用，适合 U 盘随身携带与企业纯净环境。
-
-### 2. macOS 客户端构建 (DMG 镜像 & 应用程序包)
-```bash
-npm run electron:build:mac
-```
-- **输出产物**：位于 `release/` 目录；
-- 产出高保真 `.dmg` 挂载镜像与 `.zip`，支持 Retina 视网膜屏幕与原生系统快捷键。
-
-### 3. 全局桌面快捷键
-- **`Alt + Space`**：全局呼出 / 隐藏悬浮翻译卡片；
-- **`Alt + S`**：全局随时框选截屏翻译（支持中英逐行原位严密对齐）；
-- **系统托盘驻留**：关闭主窗口自动最小化至右下角系统托盘，双击随时唤出。
-
----
-
-## 📦 Windows 客户端获取方式
-
-### 方式一：网页端一键分片安全下载 (推荐)
-- 界面顶部导航栏点击 **「📥 下载 Windows 打包版 (197MB)」**；
-- 系统已内置**流式分片还原下载体系**（将 188MB 压缩包自动按 15MB 逐片下载并在浏览器内存安全拼装），彻底解决云端代理 32MB 单请求上限；
-- 下载解压后，双击运行 **`Linguist.exe`** 即可开箱即用。
-
-### 方式二：GitHub Actions 自动构建 (CI/CD)
-- 仓库已内置 `.github/workflows/build-release.yml`；
-- 将代码推送到您的 GitHub 并在 GitHub 上发布 Release 标签（如 `v1.3.0`），GitHub Actions 就会在 Windows 云端运行机全自动打包编译并产出 Release 附件，永久提供公开高速下载。
-
 
 ---
 

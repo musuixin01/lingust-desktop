@@ -38,8 +38,6 @@ Linguist 是一款面向现代化桌面场景打造的轻量、高效、极简�
 | **CSS 引擎** | Tailwind CSS | v4.x (@tailwindcss/vite) | 现代 CSS 原子化框架，零运行时开销 |
 | **交互动效** | Motion + Canvas | motion/react | 丝滑弹簧动效与轻量渲染 |
 | **图标库** | Lucide React | 最新稳定版 | 统一符合规范的矢量图标体系 |
-| **桌面框架** | Electron | v34.x | 跨平台无边框原生桌面运行时 (Win & Mac) |
-| **桌面打包** | electron-builder | v25.x | Windows NSIS/便携版及 macOS DMG 打包 |
 | **服务端** | Express | Express 4.x | 高性能轻量 API 代理网关与静态资源托管 |
 | **AI SDK** | @google/genai | v2.4+ | 官方最新 Gen AI SDK，支持多模型回退策略 |
 
@@ -49,12 +47,7 @@ Linguist 是一款面向现代化桌面场景打造的轻量、高效、极简�
 /
 ├── .env.example                     # 环境变量定义与示例
 ├── metadata.json                    # 应用元数据与平台声明
-├── package.json                     # 项目依赖与执行脚本 (含 electron:* 脚本)
-├── electron-builder.json            # 跨平台桌面客户端打包构建配置
-├── electron/                        # 桌面端主进程与预加载架构
-│   ├── main.ts                      # Electron 主进程 (窗口、托盘、全局快捷键)
-│   ├── preload.ts                   # 安全预加载脚本 (contextBridge IPC 暴露)
-│   └── entitlements.mac.plist       # macOS 沙盒与权限清单配置
+├── package.json                     # 项目依赖与执行脚本
 ├── server.ts                        # 服务端启动装配入口（极简装配中间件与路由）
 ├── server/                          # 服务端企业级模块化拆分
 │   ├── config.ts                    # 端口、超时、跨域等服务配置
@@ -79,17 +72,27 @@ Linguist 是一款面向现代化桌面场景打造的轻量、高效、极简�
 │   │   ├── desktop/                 # macOS 桌面模拟与测试长文 (DesktopSimulator)
 │   │   └── index.ts                 # 组件对外统一导出
 │   ├── constants/                   # 全局常量配置
+│   │   ├── languages.ts             # 10 种主流多语种映射
+│   │   ├── storage.ts               # LocalStorage 统一 Key 声明
+│   │   ├── defaults.ts              # 默认配置与初始卡片词条
+│   │   └── index.ts
+│   ├── services/                    # 前端 API 与网络服务层
+│   │   ├── api.ts                   # 统一 HTTP 请求与错误封装
+│   │   ├── translationService.ts    # 翻译网络调度与降级兜底
+│   │   ├── ocrService.ts            # 截图请求与解析服务
+│   │   ├── storageService.ts        # 本地配置与历史记录持久化
+│   │   └── index.ts
+│   ├── hooks/                       # 自定义 React Hooks
+│   │   ├── useDraggable.ts          # 悬浮窗口边界拖拽逻辑
+│   │   └── index.ts
 │   ├── utils/                       # 核心通用函数
 │   │   ├── offlineEngine.ts         # 纯本地 100% 离线脱机词典引擎
-│   │   ├── speech.ts                # Web Speech 语音朗读与英美发音
-│   │   └── electron.ts              # 桌面原生 IPC 封装与运行环境侦测
+│   │   └── speech.ts                # Web Speech 语音朗读与英美发音
 │   ├── types.ts                     # TypeScript 全局接口与类型声明
-│   ├── types/electron.d.ts          # Electron API 强类型全局声明
 │   ├── App.tsx                      # 根应用主视图与状态中枢
 │   ├── main.tsx                     # React 根挂载入口
 │   └── index.css                    # Tailwind CSS 入口配置
 └── docs/                            # 企业级技术交接与规范文档
-
     ├── CHANGELOG.md                 # 实时版本更新变更日志
     ├── DESIGN_SYSTEM.md             # 全局 UI 风格规范与设计系统指南
     ├── HANDOVER.md                  # 本文档
