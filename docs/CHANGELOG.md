@@ -36,10 +36,18 @@
   - 新增后端下载路由 `/api/download/windows` 与状态查询接口 `/api/download/status`，支持浏览器直接断点续传下载；
   - 界面顶栏右侧新增「📥 下载 Windows 打包版 (197MB)」高亮按钮，并在桌面端指南与系统设置第 6 节中均集成一键直接下载入口，用户无需安装任何命令行或 Node.js 环境，解压后双击 `Linguist.exe` 即可直接开箱运行。
 
+### [Fixed] 解决 Cloud Run 32MB 单次响应上限与分片传输体系 (Chunked Stream Transfer & GitHub Actions CI/CD)
+- **突破云端代理 32MB 上限**：
+  - 根因：Google Cloud Run 负载均衡对单个 HTTP 响应体设有严格的 32MB 上限，用户浏览器直链请求 188MB 的 ZIP 文件会被云端代理直接阻断并返回 `HTTP ERROR 500`；
+  - 架构重构：新增分片传输接口 `/api/download/chunk/:index`（将 188MB 安装包切分为 13 个每片 15MB 的安全二进制分片，并提供 `/api/download/status` 暴露分片元数据）；
+  - 前端打造 `DownloadModal` 专属下载弹窗：支持实时百分比进度条（0% ~ 100%）、动态 MB 传输统计与分片计数（如 `3/13`），全部下载完毕后在浏览器内存中无缝还原组装成完整 ZIP 压缩包并自动触发文件保存；
+  - 新增 `.github/workflows/build-release.yml`：为用户 GitHub 仓库配置全自动 GitHub Actions CI/CD 流程，一旦用户在 GitHub 创建版本标签（Tag），云端 Windows 运行机便会自动编译并生成 Release 安装包，永久托管供所有人高速下载。
+
 ### [Changed] Git 仓库初始化与 GitHub 导出优化 (Git Init & .gitignore Hardening)
 - **.gitignore 规避 GitHub 100MB 限制**：
   - 将 `release/` 及 `dist-electron/` 纳入 `.gitignore`，防止已生成的 197MB Windows 客户端可执行程序超出 GitHub 100MB 单文件推送上限；
   - 完成本地 Git 仓库全量初始化与首版本规范提交（`main` 分支），确保在 AI Studio 中使用「Export to GitHub」可秒级一键推送到用户的个人 GitHub 仓库。
+
 
 ### [Added] 跨平台编译打包体系与 macOS 预设 (Windows & macOS Build Pipeline)
 - **多平台构建配置 (`electron-builder.json`)**：

@@ -159,3 +159,47 @@
 | `onShortcutTriggered(cb)`| `(cb: (action: string) => void) => () => void` | 监听全局快捷键触发事件（如 `'screenshot'`） |
 | `onTrayAction(cb)` | `(cb: (action: string) => void) => () => void` | 监听系统托盘点击菜单指令（如 `'open-settings'`） |
 
+---
+
+## 6. Windows 客户端下载与分片传输接口规范
+
+针对 Google Cloud Run 容器代理 32MB 单次响应上限，后端与前端设计了**内存安全流式分片传输体系**：
+
+### 6.1 查询打包状态与分片元数据
+
+`GET /api/download/status`
+
+**响应示例**：
+```json
+{
+  "available": true,
+  "filename": "Linguist-Windows-v1.3.0-x64.zip",
+  "sizeBytes": 196949910,
+  "sizeMb": "187.8 MB",
+  "chunkSize": 15728640,
+  "totalChunks": 13,
+  "updatedAt": "2026-09-04T10:22:15.114Z",
+  "downloadUrl": "/api/download/windows"
+}
+```
+
+### 6.2 获取二进制数据分片
+
+`GET /api/download/chunk/:index`
+
+- **参数**：`:index` 分片下标（0 到 `totalChunks - 1`）
+- **响应头**：
+  - `Content-Type`: `application/octet-stream`
+  - `Content-Length`: 当前分片字节数（通常 15MB，末尾分片自适应截断）
+  - `X-Chunk-Index`: 分片索引
+  - `X-Total-Chunks`: 总分片数
+  - `X-Total-Size`: 总文件字节数
+- **客户端行为**：前端通过 `fetch()` 逐片请求并记录进度条，完成后在浏览器内存中组装为 `Blob`，并通过 `URL.createObjectURL(blob)` 触发无损保存。
+
+### 6.3 传统直链下载
+
+`GET /api/download/windows`
+
+- 用于本地开发或直连无响应上限的容器环境，直接流式下载完整 ZIP 压缩包。
+
+

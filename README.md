@@ -123,6 +123,20 @@ npm run electron:build:mac
 
 ---
 
+## 📦 Windows 客户端获取方式
+
+### 方式一：网页端一键分片安全下载 (推荐)
+- 界面顶部导航栏点击 **「📥 下载 Windows 打包版 (197MB)」**；
+- 系统已内置**流式分片还原下载体系**（将 188MB 压缩包自动按 15MB 逐片下载并在浏览器内存安全拼装），彻底解决云端代理 32MB 单请求上限；
+- 下载解压后，双击运行 **`Linguist.exe`** 即可开箱即用。
+
+### 方式二：GitHub Actions 自动构建 (CI/CD)
+- 仓库已内置 `.github/workflows/build-release.yml`；
+- 将代码推送到您的 GitHub 并在 GitHub 上发布 Release 标签（如 `v1.3.0`），GitHub Actions 就会在 Windows 云端运行机全自动打包编译并产出 Release 附件，永久提供公开高速下载。
+
+
+---
+
 ## 🛠️ 构建与部署规范 (Build & Deploy)
 
 ### 静态检查

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { AppSettings, TranslationEngine, EngineApiKeys } from '../../types';
 import { isElectron, getPlatform, setAlwaysOnTop as electronSetAlwaysOnTop } from '../../utils/electron';
+import { DownloadModal } from '../common/DownloadModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showDeeplKey, setShowDeeplKey] = useState(false);
   const [showYoudaoSecret, setShowYoudaoSecret] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Test connection state
   const [testingEngine, setTestingEngine] = useState<TranslationEngine | null>(null);
@@ -767,14 +769,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </p>
                   </div>
                 </div>
-                <a
-                  href="/api/download/windows"
-                  download="Linguist-Windows-v1.3.0-x64.zip"
+                <button
+                  type="button"
+                  onClick={() => setShowDownloadModal(true)}
                   className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>下载 (.zip)</span>
-                </a>
+                </button>
               </div>
             </div>
 
@@ -842,6 +844,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Chunked Download Modal */}
+      <DownloadModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+      />
     </div>
   );
 };

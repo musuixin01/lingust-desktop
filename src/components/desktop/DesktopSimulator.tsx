@@ -25,6 +25,7 @@ import {
   Download,
 } from 'lucide-react';
 import { AppSettings } from '../../types';
+import { DownloadModal } from '../common/DownloadModal';
 
 interface DesktopSimulatorProps {
   settings: AppSettings;
@@ -42,6 +43,7 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
   const [activeTab, setActiveTab] = useState<'tech' | 'story' | 'vocab' | 'bilingual'>('bilingual');
   const [workspaceScene, setWorkspaceScene] = useState<'reader' | 'vscode' | 'pure'>('reader');
   const [showDesktopGuide, setShowDesktopGuide] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
   const handleCopy = (text: string, id: string) => {
@@ -109,15 +111,15 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
 
         {/* Right status bar */}
         <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-300">
-          <a
-            href="/api/download/windows"
-            download="Linguist-Windows-v1.3.0-x64.zip"
+          <button
+            type="button"
+            onClick={() => setShowDownloadModal(true)}
             className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-[11px] shadow-sm transition-all cursor-pointer"
             title="下载已为您在云端完整打包好的 Windows 绿色便携版 (解压双击即可运行)"
           >
             <Download className="w-3.5 h-3.5" />
             <span>📥 下载 Windows 打包版 (197MB)</span>
-          </a>
+          </button>
 
           <button
             type="button"
@@ -542,14 +544,14 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
                       </p>
                     </div>
                   </div>
-                  <a
-                    href="/api/download/windows"
-                    download="Linguist-Windows-v1.3.0-x64.zip"
+                  <button
+                    type="button"
+                    onClick={() => setShowDownloadModal(true)}
                     className="px-3.5 py-1.5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>立即下载 Windows 包 (.zip)</span>
-                  </a>
+                  </button>
                 </div>
                 <div className="text-[11px] text-emerald-200/90 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -656,6 +658,12 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
           </div>
         </div>
       )}
+
+      {/* Chunked Safe Download Modal */}
+      <DownloadModal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+      />
     </div>
   );
 };
