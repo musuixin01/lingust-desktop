@@ -689,8 +689,8 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         onMouseDown={handleMouseDown}
         className={`select-none app-region-drag animate-in zoom-in-95 duration-150 rounded-full backdrop-blur-3xl border text-white flex items-center px-2 sm:px-2.5 gap-1.5 relative overflow-hidden group transition-[transform,box-shadow,border-color] duration-300 ease-out apple-liquid-pill ${
           isDragging
-            ? 'scale-[1.03] shadow-[0_38px_85px_rgba(0,0,0,0.85),0_15px_30px_rgba(0,0,0,0.5),0_0_28px_rgba(59,130,246,0.35)] border-white/40 ring-1 ring-blue-400/40 cursor-grabbing'
-            : 'scale-100 shadow-[0_20px_50px_rgba(0,0,0,0.6)] border-white/20 cursor-grab hover:shadow-[0_25px_60px_rgba(0,0,0,0.65)]'
+            ? `scale-[1.03] ${isElectron() ? 'shadow-none' : 'shadow-[0_38px_85px_rgba(0,0,0,0.85),0_15px_30px_rgba(0,0,0,0.5),0_0_28px_rgba(59,130,246,0.35)]'} border-white/40 ring-1 ring-blue-400/40 cursor-grabbing`
+            : `scale-100 ${isElectron() ? 'shadow-none' : 'shadow-[0_20px_50px_rgba(0,0,0,0.6)]'} border-white/20 cursor-grab hover:shadow-[0_25px_60px_rgba(0,0,0,0.65)]`
         }`}
       >
         {/* Auto-detected notification for pill mode */}
@@ -1114,12 +1114,12 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
               opacity: settings.cardOpacity,
             }
       }
-      className={`apple-liquid-glass backdrop-blur-3xl border ${
+      className={`apple-liquid-glass backdrop-blur-3xl border overflow-hidden ${
         isMinimal ? 'rounded-2xl' : 'rounded-[32px]'
       } flex flex-col relative z-10 select-none transition-[transform,box-shadow,border-color,opacity] duration-300 ease-out ${
         isDragging
-          ? 'scale-[1.018] shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85),0_30px_60px_-10px_rgba(0,0,0,0.5),0_0_35px_rgba(59,130,246,0.25)] border-white/35 ring-1 ring-blue-400/30'
-          : 'scale-100 shadow-[0_28px_65px_-15px_rgba(0,0,0,0.58),0_10px_25px_-5px_rgba(0,0,0,0.3)] border-white/20'
+          ? `scale-[1.018] ${isElectron() ? 'shadow-none' : 'shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85),0_30px_60px_-10px_rgba(0,0,0,0.5),0_0_35px_rgba(59,130,246,0.25)]'} border-white/35 ring-1 ring-blue-400/30`
+          : `scale-100 ${isElectron() ? 'shadow-none' : 'shadow-[0_28px_65px_-15px_rgba(0,0,0,0.58),0_10px_25px_-5px_rgba(0,0,0,0.3)]'} border-white/20`
       }`}
     >
       {/* Auto-detected notification badge for card mode */}

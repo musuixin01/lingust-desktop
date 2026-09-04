@@ -9,6 +9,22 @@
 
 ---
 
+## [v1.3.3] - 2026-09-04
+
+### [Fixed] Windows 11 自定义超大圆角与外层矩形黑影边框彻底根治 (Windows 11 Large Rounded Corners & Frame Fix)
+- **主进程 DWM 与 Alpha 透明层精准配置 (`electron/main.ts`)**：
+  - 移除 `enable-transparent-visuals` 标志：此为 Linux/X11 专有指令，在 Windows 下会导致 DWM 视觉合成器异常；
+  - 移除 `roundedCorners: false`：在 Windows 11 下，该选项会强制 DWM 启用 `DWMWCP_DONOTROUND`（不圆角模式），强行在窗口外围绘制 90 度直角矩形边线；
+  - 配置 `hasShadow: true` 配合 `transparent: true` 与 `backgroundColor: '#00000000'`，遵循 Windows 11 最佳实践，避免失焦时系统绘制不活动框架装饰；
+  - 保留 `resizable: false`，防止 Windows DWM 强制注入 `WS_THICKFRAME` 系统拉伸外框，同时应用内由 IPC 与前端手柄精确控制窗口几何尺寸。
+- **前端 CSS 溢出裁切与四角暗影光晕消除 (`src/components/translator/FloatingTranslatorCard.tsx`, `src/index.css`)**：
+  - 在卡片与药丸模式的根容器上统一加上 `overflow-hidden`，严密锁死 32px / 24px 大圆角边界，杜绝任何内部子节点、头部栏或输入控件在角落溢出直角；
+  - 在 `src/index.css` 的 `.apple-liquid-glass` 与 `.apple-liquid-pill` 中移除全局外层 `box-shadow`（转为纯净的顶部与底部 `inset` 磨砂高光与反光），外阴影在 Web 模式按需由 Tailwind 提供；
+  - 在 `FloatingTranslatorCard` 中对 Electron 模式（`isElectron()`）的外部阴影进行针对性优化：在透明窗口填满状态下不外溢扩散性模糊投影，彻底消除透明窗口 4 个外侧死角因混合渲染产生的灰黑矩形晕影与脏边；
+  - 重新编译主进程脚本到 `dist-electron/main.cjs` 与 `dist-electron/preload.cjs`，确保变更立即生效。
+
+---
+
 ## [v1.3.2] - 2026-09-04
 
 ### [Fixed] 桌面端原生无边框透明渲染与响应式尺寸死循环修复 (Desktop Frameless Transparency & Window Sizing Fix)
@@ -18,7 +34,7 @@
   - 在 `electron/main.ts` 中强化容灾兜底：当网络端口尚未就绪时，自动降级挂载本地静态文件，同时后台自启内嵌 Express 服务并为 `server.ts` 引入 `EADDRINUSE` 端口智能重用，避免端口冲突闪退；
   - 在 `vite.config.ts` 中配置 `base: './'` 相对路径，彻底解决便携包在 `file://` 协议下绝对路径资源解析失败引起的白屏/灰屏。
 - **消减多余外层边框与窗口包裹感 (`electron/main.ts`, `index.html`, `src/index.css`)**：
-  - 深入排查并彻底解决 Windows DWM 强制渲染外层原生调整框问题：显式配置 `thickFrame: false`，从操作系统底层移除 `WS_THICKFRAME` 原生缩放外框与窗体边缘白/灰色投影；
+  - 深入排查并彻底解决 Windows DWM 强制渲染外层原生调整框问题：显式配置 `thickFrame: false` 与 `resizable: false`。在 Windows 底层，若 `resizable: true` 存在，Windows DWM 会强行再注入 `WS_THICKFRAME` 系统缩放边框，只有配合 `resizable: false` 才能彻底彻底抹除 Windows 外围白边与系统边框，同时应用内依然完全支持调用 API `setSize` 平滑调整卡片尺寸；
   - 显式配置 `roundedCorners: false`，消除 Windows 11 DWM 在失焦或渲染时在外层额外绘制的系统圆角外框；
   - 添加 `app.commandLine.appendSwitch('enable-transparent-visuals')`，强化 Windows 底层 Alpha 透明通道合成，消除 GPU 光栅化导致的偶发性灰黑底板；
   - 显式指定 `backgroundColor: '#00000000'`，禁用 Windows DWM 产生黑灰方形投影的 `hasShadow: false`；

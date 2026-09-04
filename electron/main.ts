@@ -2,11 +2,7 @@ import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, d
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Hardware acceleration & Windows transparency configuration
-if (process.platform === 'win32') {
-  app.commandLine.appendSwitch('enable-transparent-visuals');
-}
-
+// Electron main window lifecycle
 const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 const PORT = process.env.PORT || 3000;
 
@@ -41,14 +37,12 @@ function createMainWindow() {
     height: 520,
     minWidth: 260,
     minHeight: 46,
-    frame: false, // Frameless window: removes OS standard titlebar and chrome
-    transparent: true, // Transparent window for liquid glass design
-    thickFrame: false, // CRITICAL FOR WINDOWS: disables WS_THICKFRAME to completely remove outer OS resize border & wrapper
-    roundedCorners: false, // CRITICAL FOR WINDOWS 11: prevents DWM from drawing an external system window border
-    backgroundColor: '#00000000', // Explicit transparent background to eliminate opaque grey box
-    hasShadow: false, // Prevent Windows DWM from rendering a square grey/black box shadow
+    frame: false, // 无边框
+    transparent: true, // 核心：允许窗口透明，配合前端自绘大圆角
+    backgroundColor: '#00000000', // 确保背景完全透明（避免灰白黑底色）
+    hasShadow: true, // 保留窗口原生投影，避免系统裁切为硬角矩形框
     show: false,
-    resizable: true,
+    resizable: false, // 禁用系统默认拉伸边框，由程序化 setSize 精确调整尺寸
     alwaysOnTop: isAlwaysOnTopState,
     skipTaskbar: false,
     icon: iconPath,
