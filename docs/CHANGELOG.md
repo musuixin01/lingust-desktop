@@ -12,10 +12,11 @@
 ## [v1.3.2] - 2026-09-04
 
 ### [Fixed] 桌面端原生无边框透明渲染与响应式尺寸死循环修复 (Desktop Frameless Transparency & Window Sizing Fix)
-- **便携包白屏/灰屏加载机制修复 (`vite.config.ts`, `electron/main.ts`, `src/services/api.ts`)**：
-  - 在 `vite.config.ts` 中配置 `base: './'`，解决 Electron 打包解压后 `file://` 协议加载绝对路径 `/assets/...` 失败导致页面不渲染的根本原因；
-  - 在 `electron/main.ts` 中针对打包应用引入内嵌 Express 服务自启动与静态资源回落机制，确保在打包脱机环境下无论是直接文件加载还是本地服务均能稳定初始化；
-  - 在 `src/services/api.ts` 中增强对 `file://` 协议的自动适配，使相对接口自动路由到本地 `http://127.0.0.1:3000/api`。
+- **本地单命令调试与便携包灰屏加载彻底修复 (`package.json`, `electron/main.ts`, `server.ts`, `vite.config.ts`)**：
+  - 查明并修复本地终端执行 `npm run electron:dev` 时若未单独启动后端服务，Electron 尝试连接 `localhost:3000` 遭遇 `ECONNREFUSED` 且静态构建缺失导致的灰屏无响应；
+  - 在 `package.json` 中重构 `electron:dev`：`npm run build && npm run electron:build-main && electron .`，确保本地单指令即可秒级预构建前端与后端并拉起原生窗口；
+  - 在 `electron/main.ts` 中强化容灾兜底：当网络端口尚未就绪时，自动降级挂载本地静态文件，同时后台自启内嵌 Express 服务并为 `server.ts` 引入 `EADDRINUSE` 端口智能重用，避免端口冲突闪退；
+  - 在 `vite.config.ts` 中配置 `base: './'` 相对路径，彻底解决便携包在 `file://` 协议下绝对路径资源解析失败引起的白屏/灰屏。
 - **消减多余外层边框与窗口包裹感 (`electron/main.ts`, `index.html`, `src/index.css`)**：
   - 解决 Windows 下 `backgroundMaterial: 'acrylic'` 与 `transparent: true` 互斥产生不透明灰色方形窗口的已知缺陷，显式指定 `backgroundColor: '#00000000'`，禁用 Windows DWM 产生黑灰方形投影的 `hasShadow: false`；
   - 将 `index.html` 中的 `body` 以及 `src/index.css` 的 `html, body, #root` 根底色完全设置为透明 (`background: transparent !important`)，杜绝任何外部额外矩形背景。

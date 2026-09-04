@@ -58,17 +58,23 @@ function createMainWindow() {
   });
 
   // URL resolution: Dev server or packaged production build
+  const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+
   if (isDev) {
     const devUrl = `http://localhost:${PORT}`;
-    console.log(`[Electron] Loading dev URL: ${devUrl}`);
-    mainWindow.loadURL(devUrl);
+    console.log(`[Electron] Connecting to dev URL: ${devUrl}`);
+    mainWindow.loadURL(devUrl).catch((err) => {
+      console.warn(`[Electron] Dev server at ${devUrl} not responding (${err.message}). Loading local build files instead...`);
+      mainWindow?.loadFile(indexPath).catch((fileErr) => {
+        console.error('[Electron] Could not load local index.html. Please build the project first with "npm run build".', fileErr);
+      });
+    });
     // Open DevTools in dev mode if requested
     if (process.env.OPEN_DEVTOOLS) {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
   } else {
     // In packaged desktop application, load the built static index.html or local embedded server
-    const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
     mainWindow.loadFile(indexPath).catch(() => {
       mainWindow?.loadURL(`http://127.0.0.1:${PORT}`);
     });
@@ -80,6 +86,14 @@ function createMainWindow() {
     mainWindow?.focus();
     emitWindowState();
   });
+
+  // Fallback: ensure window is visible even if ready-to-show is delayed
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 1200);
 
   // Hide window instead of destroying on close (minimize to system tray)
   mainWindow.on('close', (event) => {
@@ -303,16 +317,17 @@ function setupIpcHandlers() {
   });
 }
 
-// Embedded Express server starter for packaged desktop client
+// Embedded Express server starter for desktop client
 function startEmbeddedServerIfNeeded() {
-  if (app.isPackaged) {
-    try {
-      const serverPath = path.join(app.getAppPath(), 'dist', 'server.cjs');
+  try {
+    const fs = require('fs');
+    const serverPath = path.join(app.getAppPath(), 'dist', 'server.cjs');
+    if (fs.existsSync(serverPath)) {
       require(serverPath);
       console.log('[Electron] Embedded server started from', serverPath);
-    } catch (e) {
-      console.warn('[Electron] Could not start embedded server:', e);
     }
+  } catch (e) {
+    console.warn('[Electron] Could not start embedded server:', e);
   }
 }
 
