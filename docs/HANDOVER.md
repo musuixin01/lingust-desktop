@@ -23,6 +23,10 @@ Linguist 是一款面向现代化桌面场景打造的轻量、高效、极简�
 3. **高精度原地框选截图翻译 (In-Place Snippet)**：
    - 无缝框选屏幕内容，原位固定悬浮卡片。
    - 视觉多模态精准转录，保持原文段落格式，呈现中英逐行严密排版对照。
+4. **生词本独立化与数据备份 (Independent Wordbook & Data Exchange)**：
+   - 生词本独立持久化（`linguist_favorites`），与翻译历史彻底解耦，清空历史绝不误删生词本；
+   - 支持历史/生词本 JSON 导出、导入恢复与剪贴板复制，跨设备迁移开箱即用；
+   - 生词本条目提供原文 + 译文双语一键发音。
 
 ---
 
@@ -81,6 +85,7 @@ Linguist 是一款面向现代化桌面场景打造的轻量、高效、极简�
 │   │   ├── translationService.ts    # 翻译网络调度与降级兜底
 │   │   ├── ocrService.ts            # 截图请求与解析服务
 │   │   ├── storageService.ts        # 本地配置与历史记录持久化
+│   │   ├── dataService.ts            # 生词本独立持久化与 JSON 导入导出
 │   │   └── index.ts
 │   ├── hooks/                       # 自定义 React Hooks
 │   │   ├── useDraggable.ts          # 悬浮窗口边界拖拽逻辑
@@ -150,7 +155,7 @@ Linguist 是一款面向现代化桌面场景打造的轻量、高效、极简�
    - **自动隐藏**：隐藏红绿灯控制条、语言选择胶囊与底部状态条。
    - **文字平滑滚动**：搜索框内容与译文超出卡片边界时，鼠标 Hover 即触发横向平滑来回滚动，保证极端小尺寸下仍可完整阅览。
 4. **胶囊药丸模式（Pill Mode）**：
-   - 高度极薄（$\sim 38\text{px}$）或点击右上角最小化按钮，变为轻盈的桌面悬浮药丸，以无限循环跑马灯呈现当前核心释义，双击或点击展开还原。
+   - 高度极薄（$\sim 38\text{px}$）或点击右上角最小化按钮，变为轻盈的桌面悬浮药丸，以「默认静止、悬停滚动、移出平滑复位」的跑马灯（JS 驱动 `transform`）呈现当前核心释义，双击或点击展开还原。
 
 ---
 
@@ -211,6 +216,11 @@ npm start
 | **有道接口提示 202 签名失败** | AppKey 与 AppSecret 不匹配或系统时间偏差 | 检查配置中是否有前后多余空格；确认服务器当前时间与 NTP 同步（签名含当前 UTC 时间戳）。 |
 | **截图 OCR 未能识别字符** | 截图区域过小或文本分辨率不足 | 建议在截图遮罩层内框选完整清晰段落；或在原网页/文档中直接通过鼠标划选，自动触发悬浮翻译气泡。 |
 | **React 提示 Objects are not valid as React child ({general, us, uk})** | 多引擎音标数据结构为复合对象，若直接放入 JSX 将导致崩溃 | 在渲染层强制使用音标提取器获取字符串（兼顾字符串与对象），规范化拼接为 `/[IPA]/` 纯文本后渲染。 |
+| **生词本被清空历史误删** | v1.2.4 及更早版本收藏角标内嵌于历史记录，清空历史会连带删除 | 升级至 v1.3.0：生词本独立存储于 `linguist_favorites`，历史抽屉「生词本」Tab 有独立清空入口，与历史完全解耦。 |
+| **历史抽屉 / 设置弹窗被悬浮卡片遮挡、点击误触卡片按钮** | 悬浮卡片默认置顶（`isPinned` 默认 `true`，`z-index: 9999`），而抽屉/弹窗原为 `z-50`，重叠区域命中卡片控件 | v1.3.0 起抽屉与设置弹窗提升为 `z-[10000]`（高于置顶卡片 9999），任何弹层恒浮于卡片之上。 |
+| **字体调节面板被使用指南 / 卡片内容遮挡** | v1.3.0 及更早版本面板为卡片 header 内 `absolute` 弹出层，受层叠上下文与 `overflow-hidden` 影响渲染位置偏移到视口顶部 | v1.3.1 起改用 React Portal 渲染到 `document.body` 顶层（`position: fixed` + `z-index: 999999`，按触发按钮视口坐标定位），任何弹层恒在全局最顶层。 |
+| **拖动字号滑条卡片内容无反应** | 旧方案仅用 `fontSize` 百分比，固定像素 Tailwind 文本类（`text-xs` 等）不随其缩放 | v1.3.1 起对卡片内容根容器应用 `zoom: effectiveFontScale` 整体缩放，字体/间距/图标等比变化，等同浏览器放大缩小。 |
+| **导入 JSON 无反应** | 文件格式非 Linguist 包裹结构或裸数组，或字段缺失 | 使用「导出」按钮生成的 JSON 文件导入；`importFromFile` 会自动校验 `sourceText` / `translatedText` 字段并去重。 |
 
 ---
 
@@ -219,6 +229,7 @@ npm start
 1. **跨平台桌面客户端封装**：可基于现有全栈架构通过 Electron / Tauri 快速构建原生 macOS (.dmg) 与 Windows (.exe) 客户端，绑定全局快捷键（如 `Option + Space` 取词，`Option + A` 截屏）。
 2. **多模态音频发音升级**：接入 Gemini Multimodal Live 或专用神经网络 TTS 引擎，获得更地道真实的自然对话发音。
 3. **生词本云端同步**：后续如需跨设备多端协同，可无缝接入 Firebase Firestore 模块，实现历史与生词本秒级同步。
+   > **v1.3.0 阶段性落地**：已先行提供「本地 JSON 导入导出 + 剪贴板复制」的跨设备备份迁移方案（`dataExchangeService`），无需外部服务即可完成数据随身携带；云端同步可作为下一阶段的增强方向。
 
 ---
 
@@ -236,4 +247,8 @@ npm start
    - **快速启动与部署**：调整构建脚本、依赖或环境变量时，实时同步更新 `README.md` 与 `.env.example`。
 3. **持久化系统指令生效**：
    - 该规约已写入项目根目录 `AGENTS.md`，由系统级 Agent 自动加载并持久化执行。
+
+| 打包后 Linguist.exe 启动即退出 | `MODULE_NOT_FOUND: vite` | `server.ts` 顶层 import vite，esbuild external 后 asar 内无 vite（devDependency 不打包） | vite 改为动态 `await import('vite')`，仅 dev 分支加载；Electron production 走 express.static 永不触发 |
+| Electron 二进制下载慢/卡住 | `node_modules/electron/dist/electron.exe` 缺失 | 官方源网络不稳定，postinstall 下载超时 | 设置 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` 后运行 `node node_modules/electron/install.js` |
+| electron-builder 打包下载 nsis/winCodeSign 超时 | `The server aborted pending request` | 官方源网络不稳定 | 设置 `ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/` 后重新打包 |
 

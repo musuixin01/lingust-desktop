@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Pin,
   Copy,
@@ -59,7 +60,11 @@ interface MarqueeTextProps {
 const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className = '', pillWidth, onOverflowChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [shouldScroll, setShouldScroll] = useState(false);
+  const xRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const hoverRef = useRef(false);
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -78,14 +83,59 @@ const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className = '', pillWid
     return () => ro.disconnect();
   }, [text, pillWidth, onOverflowChange]);
 
-  // Duration scales dynamically with text length for optimal reading pacing
+  // 阅读节奏：与旧 CSS 动画同源的动态时长，换算为每帧像素步长
   const duration = Math.max(10, Math.min(36, text.length * 0.42));
+
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const step = () => {
+    const track = trackRef.current;
+    if (!track || !hoverRef.current) return;
+    const half = track.scrollWidth / 2;
+    if (half <= 0) return;
+    const speed = half / (duration * 60);
+    xRef.current -= speed;
+    if (xRef.current <= -half) xRef.current += half; // 无缝循环
+    track.style.transition = 'none';
+    track.style.transform = `translateX(${xRef.current}px)`;
+    rafRef.current = requestAnimationFrame(step);
+  };
+
+  const handleEnter = () => {
+    hoverRef.current = true;
+    const track = trackRef.current;
+    if (track) {
+      track.style.transition = 'none';
+      track.style.transform = `translateX(${xRef.current}px)`;
+    }
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(step);
+  };
+
+  const handleLeave = () => {
+    hoverRef.current = false;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    const track = trackRef.current;
+    if (track) {
+      // 平滑复位至原始位置（0 位）
+      track.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+      track.style.transform = 'translateX(0px)';
+    }
+    xRef.current = 0;
+  };
 
   return (
     <div
       ref={containerRef}
       className="relative overflow-hidden whitespace-nowrap min-w-0 flex-1 mask-pill-marquee select-text"
       title={text}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
     >
       {/* Off-screen unconstrained span to measure natural text width */}
       <span
@@ -97,8 +147,9 @@ const MarqueeText: React.FC<MarqueeTextProps> = ({ text, className = '', pillWid
 
       {shouldScroll ? (
         <div
-          className="animate-marquee-scroll inline-flex items-center"
-          style={{ animationDuration: `${duration}s` }}
+          ref={trackRef}
+          className="inline-flex items-center whitespace-nowrap will-change-transform"
+          style={{ transform: `translateX(${xRef.current}px)` }}
         >
           <span className={className}>{text}</span>
           <span className="mx-4 text-emerald-400/50 text-[10px] select-none shrink-0">✦</span>
@@ -158,6 +209,10 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
   // Position & size state
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 380, height: 490 });
+
+  // 桌面客户端模式（Electron）：卡片即窗口，固定边缘定位，拖动/缩放走 IPC
+  const isWindowMode = Boolean((window as any).electronAPI?.isDesktop);
+  const WINDOW_EDGE = 8; // 与 electron/main.cjs 一致，透明留白给圆角与阴影空间
   const [isPinned, setIsPinned] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -233,6 +288,29 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
   useEffect(() => {
     setFontInputVal(String(currentBasePercent));
   }, [currentBasePercent]);
+
+  const fontBtnRef = useRef<HTMLButtonElement>(null);
+  const [fontPanelPos, setFontPanelPos] = useState<{ left: number; top: number } | null>(null);
+
+  // 打开字体设置面板时，基于触发按钮的视口坐标计算面板位置（Portal 渲染到 body 顶层，规避卡片层叠上下文/overflow 导致的遮挡）
+  useEffect(() => {
+    if (!isFontMenuOpen) {
+      setFontPanelPos(null);
+      return;
+    }
+    const btn = fontBtnRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const pw = 268;
+    const ph = 300;
+    let left = Math.round(r.right - pw);
+    left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+    let top = Math.round(r.bottom + 8);
+    if (top + ph > window.innerHeight) {
+      top = Math.max(8, Math.round(r.top - ph - 8));
+    }
+    setFontPanelPos({ left, top });
+  }, [isFontMenuOpen]);
 
   // 点击外部自动关闭字体设置气泡
   useEffect(() => {
@@ -405,6 +483,9 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       startX: position.x,
       startY: position.y,
     };
+    if (isWindowMode) {
+      (window as any).electronAPI?.startDrag(e.clientX, e.clientY);
+    }
   };
 
   useEffect(() => {
@@ -419,6 +500,12 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         setIsDragging(true);
       }
 
+      if (isWindowMode) {
+        // 桌面模式：窗口整体移动由主进程接管
+        (window as any).electronAPI?.dragMove(e.clientX, e.clientY);
+        return;
+      }
+
       const cardWidth = isMinimized ? 220 : size.width;
       const cardHeight = isMinimized ? 50 : size.height;
       const newX = Math.max(10, Math.min(window.innerWidth - cardWidth - 10, pendingDragRef.current.startX + dx));
@@ -429,6 +516,9 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 
     const handleMouseUp = () => {
       pendingDragRef.current.active = false;
+      if (isWindowMode) {
+        (window as any).electronAPI?.endDrag();
+      }
       if (isDragging) {
         setIsDragging(false);
       }
@@ -460,6 +550,8 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
   ) => {
     e.stopPropagation();
     e.preventDefault();
+    // 桌面模式下仅允许右下角缩放（左/上方向缩放需同步窗口位置，当前版本不支持）
+    if (isWindowMode && direction !== 'se') return;
     // Cancel any pending drag immediately so resize has absolute priority
     pendingDragRef.current.active = false;
     setIsDragging(false);
@@ -584,6 +676,14 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 
   const isDark = settings.themeMode === 'dark';
 
+  // 桌面模式：卡片尺寸变化 -> 同步窗口尺寸（含药丸/极简形态，与主进程 WINDOW_EDGE 留白一致）
+  useEffect(() => {
+    if (!isWindowMode) return;
+    const w = isPill ? Math.max(160, size.width) : size.width;
+    const h = isPill ? Math.max(38, Math.min(60, size.height <= 70 ? size.height : 46)) : size.height;
+    (window as any).electronAPI?.resizeWindow(w, h);
+  }, [size, isPill, isWindowMode]);
+
   // 1. Minimized / Dynamic Pill State (药丸胶囊状态：随尺寸全响应式自适应，各部件流式伸缩，翻译循环滚动)
   if (isPill) {
     const pillHeight = Math.max(38, Math.min(60, size.height <= 70 ? size.height : 46));
@@ -603,15 +703,17 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       <div
         style={{
           position: 'fixed',
-          left: `${position.x}px`,
-          top: `${position.y}px`,
+          left: isWindowMode ? `${WINDOW_EDGE}px` : `${position.x}px`,
+          top: isWindowMode ? `${WINDOW_EDGE}px` : `${position.y}px`,
           width: `${pillWidth}px`,
           height: `${pillHeight}px`,
           zIndex: isPinned ? 9999 : 50,
           opacity: settings.cardOpacity,
+          // 桌面模式：深色半透明底 + 毛玻璃；浏览器模式走 bg-slate-950/85
+          backgroundColor: isWindowMode ? 'rgba(2, 6, 23, 0.6)' : undefined,
         }}
         onMouseDown={handleMouseDown}
-        className={`select-none animate-in zoom-in-95 duration-150 rounded-full backdrop-blur-3xl bg-slate-950/85 border text-white flex items-center px-2 sm:px-2.5 gap-1.5 relative overflow-hidden group transition-[transform,box-shadow,border-color] duration-300 ease-out ${
+        className={`select-none animate-in zoom-in-95 duration-150 rounded-full ${isWindowMode ? 'backdrop-blur-3xl' : 'backdrop-blur-3xl bg-slate-950/85'} border text-white flex items-center px-2 sm:px-2.5 gap-1.5 relative overflow-hidden group transition-[transform,box-shadow,border-color] duration-300 ease-out ${
           isDragging
             ? 'scale-[1.03] shadow-[0_38px_85px_rgba(0,0,0,0.85),0_15px_30px_rgba(0,0,0,0.5),0_0_28px_rgba(59,130,246,0.35)] border-white/40 ring-1 ring-blue-400/40 cursor-grabbing'
             : 'scale-100 shadow-[0_20px_50px_rgba(0,0,0,0.6)] border-white/20 cursor-grab hover:shadow-[0_25px_60px_rgba(0,0,0,0.65)]'
@@ -1012,16 +1114,18 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
     <div
       style={{
         position: 'fixed',
-        left: `${position.x}px`,
-        top: `${position.y}px`,
+        left: isWindowMode ? `${WINDOW_EDGE}px` : `${position.x}px`,
+        top: isWindowMode ? `${WINDOW_EDGE}px` : `${position.y}px`,
         width: `${size.width}px`,
         height: `${size.height}px`,
         maxWidth: 'calc(100vw - 20px)',
         maxHeight: 'calc(100vh - 35px)',
         zIndex: isPinned ? 9999 : 40,
         opacity: settings.cardOpacity,
+        // 桌面模式：深色半透明底保证主题色+文字可读，backdrop-blur 保留毛玻璃质感；浏览器模式走 bg-white/10
+        backgroundColor: isWindowMode ? 'rgba(15, 23, 42, 0.55)' : undefined,
       }}
-      className={`bg-white/10 backdrop-blur-3xl border ${
+      className={`${isWindowMode ? 'backdrop-blur-3xl' : 'bg-white/10 backdrop-blur-3xl'} border ${
         isMinimal ? 'rounded-2xl' : 'rounded-[32px]'
       } flex flex-col relative z-10 select-none transition-[transform,box-shadow,border-color,opacity] duration-300 ease-out ${
         isDragging
@@ -1146,6 +1250,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
           {/* Font Size Adjuster with Input & Quick Presets */}
           <div className="relative font-popover-container">
             <button
+              ref={fontBtnRef}
               type="button"
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => setIsFontMenuOpen((prev) => !prev)}
@@ -1160,123 +1265,135 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
               {size.width >= 360 && <span className="text-[10px] leading-none">{currentBasePercent}%</span>}
             </button>
 
-            {/* Font Size Popover Dialog */}
-            {isFontMenuOpen && (
-              <div
-                onMouseDown={(e) => e.stopPropagation()}
-                className="absolute right-0 top-full mt-1.5 w-60 p-3 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-2.5 text-xs text-white"
-              >
-                <div className="flex items-center justify-between pb-1 border-b border-white/10">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-100">
-                    <Type className="w-3.5 h-3.5 text-blue-400" />
-                    <span>字体大小与排版</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsFontMenuOpen(false)}
-                    className="text-white/40 hover:text-white p-0.5 rounded-md transition-colors cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Direct Numeric Input with Steppers */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] text-white/70">
-                    <span>支持直接输入字号:</span>
-                    <span className="font-mono text-blue-400 font-semibold">{currentBasePercent}%</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleFontPercentChange(Math.max(60, currentBasePercent - 5))}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 transition-colors cursor-pointer"
-                      title="缩小 5%"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <div className="relative flex-1">
-                      <input
-                        type="number"
-                        min={60}
-                        max={150}
-                        step={1}
-                        value={fontInputVal}
-                        onChange={(e) => {
-                          setFontInputVal(e.target.value);
-                          const num = parseInt(e.target.value, 10);
-                          if (!isNaN(num) && num >= 50 && num <= 180) {
-                            handleFontPercentChange(num);
-                          }
-                        }}
-                        onBlur={() => {
-                          const num = parseInt(fontInputVal, 10);
-                          if (isNaN(num) || num < 60) {
-                            handleFontPercentChange(60);
-                          } else if (num > 150) {
-                            handleFontPercentChange(150);
-                          }
-                        }}
-                        className="w-full px-2.5 py-1 text-center font-mono font-semibold text-xs rounded-lg bg-white/10 border border-white/20 text-white focus:outline-hidden focus:border-blue-400 focus:bg-white/15 pr-6"
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/40 font-mono pointer-events-none">
-                        %
-                      </span>
+            {/* Font Size Popover Dialog — Portal 渲染到 body 顶层，彻底规避卡片层叠上下文/overflow 导致的遮挡 */}
+            {isFontMenuOpen &&
+              fontPanelPos &&
+              createPortal(
+                <div
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="font-panel-enter font-popover-container fixed w-[268px] p-3 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl space-y-2.5 text-xs text-white"
+                  style={{ left: fontPanelPos.left, top: fontPanelPos.top, zIndex: 999999 }}
+                >
+                  <div className="flex items-center justify-between pb-1 border-b border-white/10">
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-100">
+                      <Type className="w-3.5 h-3.5 text-blue-400" />
+                      <span>字体大小与排版</span>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleFontPercentChange(Math.min(150, currentBasePercent + 5))}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 transition-colors cursor-pointer"
-                      title="放大 5%"
+                      onClick={() => setIsFontMenuOpen(false)}
+                      className="text-white/40 hover:text-white p-0.5 rounded-md transition-colors cursor-pointer"
                     >
-                      <Plus className="w-3 h-3" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                </div>
 
-                {/* Quick Presets */}
-                <div className="grid grid-cols-4 gap-1 pt-0.5">
-                  {[
-                    { label: '紧凑', percent: 80 },
-                    { label: '默认', percent: 92 },
-                    { label: '标准', percent: 100 },
-                    { label: '大字', percent: 115 },
-                  ].map((preset) => (
+                  {/* 滑条 + 加减 */}
+                  <div className="pt-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleFontPercentChange(currentBasePercent - 5)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 transition-all cursor-pointer active:scale-90"
+                        title="缩小 5%"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <input
+                        type="range"
+                        min={60}
+                        max={150}
+                        step={1}
+                        value={currentBasePercent}
+                        onChange={(e) => handleFontPercentChange(Number(e.target.value))}
+                        className="font-range flex-1 min-w-0"
+                        style={{ '--fill': `${((currentBasePercent - 60) / 90) * 100}%` } as any}
+                        aria-label="调整整体字体大小"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleFontPercentChange(currentBasePercent + 5)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 transition-all cursor-pointer active:scale-90"
+                        title="放大 5%"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* 当前值 + 直接输入 */}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+                      <span className="text-[11px] text-white/70">整体字号</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold font-mono text-blue-400 leading-none tabular-nums">
+                          {currentBasePercent}%
+                        </span>
+                        <div className="relative w-16">
+                          <input
+                            type="number"
+                            min={60}
+                            max={150}
+                            step={1}
+                            value={fontInputVal}
+                            onChange={(e) => {
+                              setFontInputVal(e.target.value);
+                              const num = parseInt(e.target.value, 10);
+                              if (!isNaN(num) && num >= 50 && num <= 180) {
+                                handleFontPercentChange(num);
+                              }
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(fontInputVal, 10);
+                              if (isNaN(num) || num < 60) {
+                                handleFontPercentChange(60);
+                              } else if (num > 150) {
+                                handleFontPercentChange(150);
+                              }
+                            }}
+                            className="w-full px-1.5 py-1 text-center font-mono font-semibold text-xs rounded-lg bg-white/10 border border-white/20 text-white focus:outline-hidden focus:border-blue-400 focus:bg-white/15"
+                          />
+                          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-white/40 font-mono pointer-events-none">
+                            %
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 快速预设 */}
+                  <div className="grid grid-cols-4 gap-1 pt-0.5">
+                    {[
+                      { label: '紧凑', percent: 80 },
+                      { label: '默认', percent: 92 },
+                      { label: '标准', percent: 100 },
+                      { label: '大字', percent: 115 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.percent}
+                        type="button"
+                        onClick={() => handleFontPercentChange(preset.percent)}
+                        className={`px-1 py-1.5 rounded-lg text-center border transition-all cursor-pointer active:scale-95 ${currentBasePercent === preset.percent ? 'bg-blue-500/20 text-blue-300 border-blue-400/50 font-semibold' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'}`}
+                      >
+                        <div className="font-mono text-[11px]">{preset.percent}%</div>
+                        <div className="text-[9px] text-white/40 mt-0.5">{preset.label}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 动态紧凑布局 */}
+                  <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                    <span className="text-[11px] text-white/70">动态紧凑布局</span>
                     <button
-                      key={preset.percent}
                       type="button"
-                      onClick={() => handleFontPercentChange(preset.percent)}
-                      className={`px-1 py-1 rounded-lg text-center text-[10px] font-mono border transition-all cursor-pointer ${
-                        currentBasePercent === preset.percent
-                          ? 'bg-blue-500/20 text-blue-300 border-blue-400/50 font-semibold'
-                          : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'
-                      }`}
+                      onClick={() => onUpdateSettings?.({ compactMode: !settings.compactMode })}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors cursor-pointer ${settings.compactMode ? 'bg-blue-500/20 text-blue-300 border-blue-400/40' : 'bg-white/5 text-white/40 border-white/10 hover:text-white'}`}
                     >
-                      <div>{preset.percent}%</div>
-                      <div className="text-[9px] text-white/40">{preset.label}</div>
+                      {settings.compactMode ? '始终紧凑' : '跟随尺寸'}
                     </button>
-                  ))}
-                </div>
-
-                {/* Dynamic Compact Layout Switch */}
-                <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-[11px] text-white/70">动态紧凑布局</span>
-                  <button
-                    type="button"
-                    onClick={() => onUpdateSettings?.({ compactMode: !settings.compactMode })}
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors cursor-pointer ${
-                      settings.compactMode
-                        ? 'bg-blue-500/20 text-blue-300 border-blue-400/40'
-                        : 'bg-white/5 text-white/40 border-white/10 hover:text-white'
-                    }`}
-                  >
-                    {settings.compactMode ? '始终紧凑' : '跟随尺寸'}
-                  </button>
-                </div>
-              </div>
-            )}
+                  </div>
+                </div>,
+                document.body,
+              )}
           </div>
-
           <button
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
@@ -1295,7 +1412,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         /* Minimal Card View: ONLY Search Box and Translation with Corner Hover Controls */
         <div
           onMouseDown={handleMouseDown}
-          style={{ fontSize: `${baseFontScale * 100}%` }}
+          style={{ zoom: baseFontScale }}
           className="card-minimal-container p-2 flex flex-col justify-center h-full w-full space-y-1 overflow-hidden select-text relative"
         >
           {/* Top-Left Corner Sensor: 严格仅限最左上角极小区域 (40px×32px)，优先拦截并阻止移动 */}
@@ -1584,7 +1701,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         </div>
       ) : (
         <div
-          style={{ fontSize: `${effectiveFontScale * 100}%` }}
+          style={{ zoom: effectiveFontScale }}
           className={`${
             isDynamicTight
               ? 'p-2 space-y-1.5'

@@ -12,6 +12,7 @@ import {
 } from './components';
 import { speakText } from './utils/speech';
 import { translateOffline } from './utils/offlineEngine';
+import { favoritesService, dataExchangeService } from './services';
 
 // Default initial state matching the Frosted Glass design mock
 const INITIAL_RESULT: TranslationResult = {
@@ -84,6 +85,11 @@ export default function App() {
     }
   });
 
+  // 独立生词本 (Wordbook)：与历史完全解耦，清空历史不会误删收藏
+  const [favorites, setFavorites] = useState<TranslationResult[]>(() =>
+    favoritesService.loadFavorites()
+  );
+
   // UI Drawer & Modal States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -114,6 +120,10 @@ export default function App() {
       console.warn('Failed to save history to localStorage', e);
     }
   }, [history]);
+
+  useEffect(() => {
+    favoritesService.saveFavorites(favorites);
+  }, [favorites]);
 
   // Core translate function
   const handleTranslate = useCallback(
@@ -162,6 +172,7 @@ export default function App() {
           synonyms: data?.synonyms || [],
           timestamp: Date.now(),
           engine: data?.engine || settings.translationEngine,
+          isFavorite: favoritesService.isFavoriteByText(favorites, text),
         };
 
         setResult(newResult);
@@ -185,7 +196,7 @@ export default function App() {
         setLoading(false);
       }
     },
-    [sourceLang, targetLang, settings.autoSpeak, settings.translationEngine, settings.engineKeys]
+    [sourceLang, targetLang, settings.autoSpeak, settings.translationEngine, settings.engineKeys, favorites]
   );
 
   // Core OCR screenshot translate function (在所截屏位置固定所选大小，支持调整尺寸与挪动，呈现中英逐行对照)
@@ -381,6 +392,74 @@ export default function App() {
     }
   };
 
+  // 清空生词本（不影响历史），并同步清除历史记录中的收藏角标
+  const handleClearFavorites = useCallback(() => {
+    setFavorites([]);
+    favoritesService.clearFavorites();
+    setHistory((prev) => prev.map((h) => ({ ...h, isFavorite: false })));
+  }, []);
+
+  // 导出历史 / 生词本数据为本地 JSON 文件
+  const handleExportData = useCallback(
+    (type: 'history' | 'favorites') => {
+      const data = type === 'favorites' ? favorites : history;
+      const date = new Date().toISOString().slice(0, 10);
+      dataExchangeService.exportToFile(data, type, `linguist-${type}-${date}.json`);
+    },
+    [favorites, history]
+  );
+
+  // 复制历史 / 生词本数据为 JSON 文本
+  const handleCopyData = useCallback(
+    async (type: 'history' | 'favorites') => {
+      const data = type === 'favorites' ? favorites : history;
+      try {
+        await dataExchangeService.copyToClipboard(data);
+      } catch (e) {
+        console.warn('复制到剪贴板失败:', e);
+      }
+    },
+    [favorites, history]
+  );
+
+  // 导入数据（自动分流：isFavorite 归入生词本，其余归入历史）
+  const handleImportData = useCallback((file: File) => {
+    dataExchangeService
+      .importFromFile(file)
+      .then((items) => {
+        if (items.length === 0) {
+          console.warn('导入数据为空，已忽略');
+          return;
+        }
+        const favItems = items.filter((i) => i.isFavorite);
+        const histItems = items.filter((i) => !i.isFavorite);
+        if (favItems.length > 0) {
+          setFavorites((prev) => {
+            const merged = [...favItems, ...prev];
+            const unique: TranslationResult[] = [];
+            const seen = new Set<string>();
+            for (const item of merged) {
+              const key = item.sourceText.trim().toLowerCase();
+              if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(item);
+              }
+            }
+            return unique.slice(0, 50);
+          });
+        }
+        if (histItems.length > 0) {
+          setHistory((prev) => {
+            const filtered = prev.filter(
+              (h) => !histItems.some((i) => i.sourceText.toLowerCase() === h.sourceText.toLowerCase())
+            );
+            return [...histItems, ...filtered].slice(0, 50);
+          });
+        }
+      })
+      .catch((err) => console.warn(err.message));
+  }, []);
+
   // Swap source and target languages
   const handleSwapLanguages = () => {
     const newSource = targetLang;
@@ -393,15 +472,25 @@ export default function App() {
     }
   };
 
-  // Toggle favorite
-  const handleToggleFavorite = (id: string) => {
-    setHistory((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, isFavorite: !item.isFavorite } : item))
-    );
-    if (result && result.id === id) {
-      setResult((prev) => (prev ? { ...prev, isFavorite: !prev.isFavorite } : null));
-    }
-  };
+  // Toggle favorite (生词本独立存储：清空历史不会误删收藏)
+  const handleToggleFavorite = useCallback(
+    (id: string) => {
+      const item =
+        history.find((h) => h.id === id) ||
+        (result && result.id === id ? result : null);
+      if (!item) return;
+
+      setFavorites((prev) => favoritesService.toggleFavoriteByItem(prev, item));
+
+      // 同步卡片与历史列表中的收藏角标状态
+      const nextFlag = !favoritesService.isFavoriteByText(favorites, item.sourceText);
+      setHistory((prev) => prev.map((h) => (h.id === id ? { ...h, isFavorite: nextFlag } : h)));
+      if (result && result.id === id) {
+        setResult((prev) => (prev ? { ...prev, isFavorite: nextFlag } : null));
+      }
+    },
+    [history, result, favorites]
+  );
 
   // Quick word lookup handler (from examples or sample chips)
   const handleSelectWord = (word: string) => {
@@ -529,15 +618,20 @@ export default function App() {
     'minimal-light': 'bg-gradient-to-br from-[#f1f5f9] via-[#e2e8f0] to-[#cbd5e1]',
   }[settings.desktopWallpaper];
 
+  // 桌面客户端模式（Electron）：隐藏浏览器模拟桌面，窗口即悬浮卡片
+  const isDesktop = Boolean((window as any).electronAPI?.isDesktop);
+
   return (
-    <div className={`relative w-screen h-screen overflow-hidden ${wallpaperClass}`}>
-      {/* Background simulated macOS Desktop Workspace */}
-      <DesktopSimulator
-        settings={settings}
-        onQuickSelectWord={handleSelectWord}
-        onOpenSnipper={() => setIsSnipperOpen(true)}
-        isDark={settings.desktopWallpaper !== 'minimal-light'}
-      />
+    <div className={`relative w-screen h-screen overflow-hidden ${isDesktop ? 'bg-transparent' : wallpaperClass}`}>
+      {/* Background simulated macOS Desktop Workspace（桌面客户端模式下不渲染模拟桌面） */}
+      {!isDesktop && (
+        <DesktopSimulator
+          settings={settings}
+          onQuickSelectWord={handleSelectWord}
+          onOpenSnipper={() => setIsSnipperOpen(true)}
+          isDark={settings.desktopWallpaper !== 'minimal-light'}
+        />
+      )}
 
       {/* The Core Floating Desktop Translator Window */}
       <FloatingTranslatorCard
@@ -607,6 +701,11 @@ export default function App() {
         settings={settings}
         onUpdateSettings={(newSettings) => setSettings((prev) => ({ ...prev, ...newSettings }))}
         isDark={settings.themeMode === 'dark'}
+        history={history}
+        favorites={favorites}
+        onExport={handleExportData}
+        onImport={handleImportData}
+        onCopy={handleCopyData}
       />
 
       {/* History & Favorites Drawer */}
@@ -614,6 +713,7 @@ export default function App() {
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
         history={history}
+        favorites={favorites}
         onSelectResult={(item) => {
           setSourceText(item.sourceText);
           setSourceLang(item.sourceLang);
@@ -622,6 +722,9 @@ export default function App() {
         }}
         onToggleFavorite={handleToggleFavorite}
         onClearHistory={() => setHistory([])}
+        onClearFavorites={handleClearFavorites}
+        onExport={handleExportData}
+        onImport={handleImportData}
         isDark={settings.themeMode === 'dark'}
       />
     </div>

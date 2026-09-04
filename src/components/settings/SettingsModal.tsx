@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   X,
   Sliders,
@@ -19,8 +19,12 @@ import {
   RotateCw,
   Cpu,
   Type,
+  Database,
+  Download,
+  Upload,
+  ClipboardCopy,
 } from 'lucide-react';
-import { AppSettings, TranslationEngine, EngineApiKeys } from '../../types';
+import { AppSettings, TranslationEngine, EngineApiKeys, TranslationResult } from '../../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -28,6 +32,11 @@ interface SettingsModalProps {
   settings: AppSettings;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => void;
   isDark?: boolean;
+  history: TranslationResult[];
+  favorites: TranslationResult[];
+  onExport: (type: 'history' | 'favorites') => void;
+  onImport: (file: File) => void;
+  onCopy: (type: 'history' | 'favorites') => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -36,7 +45,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings,
   isDark = false,
+  history,
+  favorites,
+  onExport,
+  onImport,
+  onCopy,
 }) => {
+  const importInputRef = useRef<HTMLInputElement>(null);
   if (!isOpen) return null;
 
   // Local state for password visibility
@@ -96,7 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className={`w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border transition-all ${
           isDark
@@ -680,6 +695,68 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Section 7: 数据与备份管理（导入导出 / 剪贴板） */}
+        <div className="p-3 rounded-xl bg-black/5 dark:bg-white/5 space-y-2.5">
+          <div className="font-semibold flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5 text-blue-500" />
+            <span>数据与备份管理</span>
+            <span className="ml-auto text-[10px] text-slate-400">
+              历史 {history.length} · 生词本 {favorites.length}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+            生词本与翻译历史已独立存储，清空历史不会误删生词本；支持 JSON 备份导出与跨设备迁移恢复。
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => onExport('history')}
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <Download className="w-3 h-3" />
+              导出全部历史
+            </button>
+            <button
+              type="button"
+              onClick={() => onExport('favorites')}
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <Download className="w-3 h-3" />
+              导出全部生词本
+            </button>
+            <button
+              type="button"
+              onClick={() => onCopy('favorites')}
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <ClipboardCopy className="w-3 h-3" />
+              复制生词本 JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <Upload className="w-3 h-3" />
+              从 JSON 导入
+            </button>
+          </div>
+          <div className="text-[10px] text-slate-400 leading-snug">
+            导入时自动分流：带「收藏标记」的条目归入生词本，其余归入翻译历史；相同原文自动去重。
+          </div>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImport(file);
+              e.target.value = '';
+            }}
+          />
         </div>
 
         {/* Modal Footer */}

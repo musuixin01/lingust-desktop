@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Electron 打包产物
+release/
+

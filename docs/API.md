@@ -139,3 +139,52 @@
   "message": "未检测到 Gemini API Key，请先输入密钥"
 }
 ```
+
+---
+
+## 5. 本地数据导入导出格式 (Data Exchange Format)
+
+历史与生词本的导出 / 导入为**纯前端本地能力**（非 HTTP 接口），由 `src/services/dataService.ts` 的 `dataExchangeService` 提供。
+
+### 5.1 导出文件结构（包裹格式）
+
+```json
+{
+  "app": "Linguist",
+  "type": "favorites",
+  "version": 1,
+  "exportedAt": "2026-09-03T00:00:00.000Z",
+  "items": [
+    {
+      "id": "res-1725321600000",
+      "sourceText": "Efficient",
+      "translatedText": "高效的；有能力的",
+      "sourceLang": "EN",
+      "targetLang": "ZH",
+      "isWord": true,
+      "isFavorite": true,
+      "phonetic": { "us": "/ɪˈfɪʃnt/", "uk": "/ɪˈfɪʃnt/" },
+      "definitions": [ { "partOfSpeech": "adj.", "meaning": "高效的；有能力的" } ],
+      "examples": [ { "src": "...", "dst": "..." } ],
+      "synonyms": ["effective", "productive"],
+      "timestamp": 1725321600000,
+      "engine": "gemini"
+    }
+  ]
+}
+```
+
+**字段说明**：
+- `type`：`"history"` 或 `"favorites"`，仅用于标注语义，导入时以条目级 `isFavorite` 为准；
+- `items`：`TranslationResult[]` 数组，元素字段与 `/api/translate` 成功响应保持一致。
+
+### 5.2 导入规则
+
+- 兼容**包裹结构**（如上）与**裸数组**（`TranslationResult[]`）两种格式；
+- 仅保留含有效 `sourceText` 与 `translatedText` 的条目；
+- 按「原文（忽略大小写）」自动去重，上限 50 条；
+- 自动分流：`isFavorite: true` 的条目归入生词本（`linguist_favorites`），其余归入翻译历史（`linguist_history`）。
+
+### 5.3 剪贴板格式
+
+与导出文件中的 `items` 数组一致（JSON 数组文本），便于临时迁移与分享。
