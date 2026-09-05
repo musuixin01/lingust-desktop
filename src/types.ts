@@ -94,7 +94,4 @@ export interface AppSettings {
   compactMode: boolean;
   fontSize: FontSizePreference; // 自定义字体大小预设
   customFontSize?: number; // 精确百分比字号 (60% ~ 150%)，支持直接输入调节
-  alwaysOnTop?: boolean; // 桌面端窗口是否置顶
-  enableAcrylicGlass?: boolean; // Windows 11 Acrylic / Mica 原生磨砂玻璃特效
-  simulatedDesktopInElectron?: boolean; // 在桌面端是否仍然保留仿真桌面壁纸
 }

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X, Search, Star, Trash2, Clock, Volume2, ArrowRight } from 'lucide-react';
 import { TranslationResult } from '../../types';
 import { speakText } from '../../utils/speech';
-import { isElectron } from '../../utils/electron';
 
 interface HistoryDrawerProps {
   isOpen: boolean;
@@ -41,16 +40,16 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
     .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${isElectron() ? 'p-0' : 'p-0 sm:p-3'} bg-black/30 backdrop-blur-xs animate-in fade-in duration-200`}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className={`w-full h-full sm:max-w-sm sm:h-full rounded-[32px] overflow-hidden ${isElectron() ? 'shadow-none' : 'shadow-2xl'} flex flex-col border transition-all apple-liquid-glass backdrop-blur-3xl ${
+        className={`w-full max-w-sm h-full shadow-2xl flex flex-col border-l transition-all ${
           isDark
-            ? 'bg-slate-900/95 border-white/20 text-slate-100'
+            ? 'bg-slate-900/95 border-white/15 text-slate-100'
             : 'bg-white/95 border-slate-200 text-slate-800'
         }`}
       >
         {/* Drawer Header */}
-        <div className="p-4 border-b border-black/5 dark:border-white/10 flex items-center justify-between app-region-drag select-none">
+        <div className="p-4 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-blue-500" />
             <h3 className="font-semibold text-sm">翻译历史与生词本</h3>
@@ -58,7 +57,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="no-drag p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
           >
             <X className="w-4 h-4" />
           </button>

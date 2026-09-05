@@ -26,14 +26,6 @@ import { WordDetailView } from './WordDetailView';
 import { ScreenshotTranslationView } from '../screenshot/ScreenshotTranslationView';
 import { speakText } from '../../utils/speech';
 import { HoverScrollText } from '../common/HoverScrollText';
-import {
-  isElectron,
-  setAlwaysOnTop as electronSetAlwaysOnTop,
-  syncWindowSize,
-  minimizeWindow,
-  closeWindow,
-} from '../../utils/electron';
-import { detectLanguageWithDetails } from '../../utils/languageDetector';
 
 // Helper to construct complete translation text (把单词的音标、所有词性及全部释义完整翻译)
 export const getCompleteTranslation = (res: TranslationResult | null): string => {
@@ -165,12 +157,7 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 }) => {
   // Position & size state
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [size, setSize] = useState<{ width: number; height: number }>(() => {
-    if (typeof window !== 'undefined' && isElectron()) {
-      return { width: window.innerWidth || 390, height: window.innerHeight || 520 };
-    }
-    return { width: 380, height: 490 };
-  });
+  const [size, setSize] = useState<{ width: number; height: number }>({ width: 380, height: 490 });
   const [isPinned, setIsPinned] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -213,65 +200,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       setIsMinimalTopRightHovered(false);
     }, 250);
   };
-
-  // Auto-detected language notification state
-  const [autoDetectedInfo, setAutoDetectedInfo] = useState<{
-    langCode: string;
-    langName: string;
-    flag: string;
-  } | null>(null);
-  const autoDetectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Auto-detect language handler triggered when user pastes text into the source input
-  const handleSourcePaste = (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const pastedText = e.clipboardData?.getData('text');
-    if (!pastedText || !pastedText.trim()) return;
-
-    const detection = detectLanguageWithDetails(pastedText);
-    if (detection) {
-      const detectedLang = detection.detectedLang;
-
-      // 1. Automatically update sourceLang state
-      if (detectedLang !== sourceLang) {
-        onSourceLangChange(detectedLang);
-      }
-
-      // 2. Automatically adjust targetLang if same as detected to prevent identical source-target collision
-      let currentEffectiveTarget = targetLang;
-      if (detectedLang === targetLang) {
-        currentEffectiveTarget = detectedLang === 'ZH' ? 'EN' : 'ZH';
-        onTargetLangChange(currentEffectiveTarget);
-      }
-
-      // 3. Show visual feedback indicator badge
-      setAutoDetectedInfo({
-        langCode: detectedLang,
-        langName: detection.langName,
-        flag: detection.flag,
-      });
-      if (autoDetectTimeoutRef.current) clearTimeout(autoDetectTimeoutRef.current);
-      autoDetectTimeoutRef.current = setTimeout(() => {
-        setAutoDetectedInfo(null);
-      }, 3200);
-
-      // 4. Update sourceText with pasted text (respecting cursor selection) and immediately translate
-      const targetElement = e.currentTarget;
-      const start = targetElement.selectionStart ?? 0;
-      const end = targetElement.selectionEnd ?? 0;
-      const currentVal = targetElement.value || '';
-      const combinedText = currentVal.slice(0, start) + pastedText + currentVal.slice(end);
-
-      onSourceTextChange(combinedText);
-      onTranslate(combinedText, detectedLang, currentEffectiveTarget);
-      e.preventDefault();
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (autoDetectTimeoutRef.current) clearTimeout(autoDetectTimeoutRef.current);
-    };
-  }, []);
 
   // Dynamic scale tiers based on dynamic card dimensions
   // Pill capsule is ONLY shown when explicitly minimized
@@ -318,41 +246,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
     window.addEventListener('mousedown', handleOutsideClick);
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, [isFontMenuOpen]);
-
-  // Synchronize Always-on-Top state with Electron desktop window
-  useEffect(() => {
-    electronSetAlwaysOnTop(isPinned);
-  }, [isPinned]);
-
-  // Synchronize dynamic card dimensions with Electron frameless desktop window
-  const lastExpandedSizeRef = useRef<{ width: number; height: number }>({ width: 390, height: 520 });
-  const prevPillRef = useRef(isPill);
-  const prevMinimalRef = useRef(isMinimal);
-
-  useEffect(() => {
-    if (!isElectron()) return;
-
-    if (isPill && !prevPillRef.current) {
-      // Transition to pill mode: store last expanded dimensions and contract window
-      lastExpandedSizeRef.current = {
-        width: Math.max(340, window.innerWidth || size.width),
-        height: Math.max(420, window.innerHeight || size.height),
-      };
-      const targetPillW = Math.max(280, Math.min(size.width, 420));
-      syncWindowSize(targetPillW, 54);
-    } else if (!isPill && prevPillRef.current) {
-      // Restored from pill mode
-      syncWindowSize(lastExpandedSizeRef.current.width, lastExpandedSizeRef.current.height);
-    } else if (isMinimal && !prevMinimalRef.current) {
-      // Switched to minimal mode
-      syncWindowSize(Math.max(260, Math.min(size.width, 360)), 180);
-    } else if (!isMinimal && prevMinimalRef.current && !isPill) {
-      // Restored from minimal mode
-      syncWindowSize(lastExpandedSizeRef.current.width, lastExpandedSizeRef.current.height);
-    }
-    prevPillRef.current = isPill;
-    prevMinimalRef.current = isMinimal;
-  }, [isPill, isMinimal, size.width]);
 
   const handleFontPercentChange = (val: number) => {
     const clamped = Math.max(60, Math.min(150, Math.round(val)));
@@ -419,14 +312,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
   // Window resize handler: keeps card strictly within bounds and avoids viewport overflow
   useEffect(() => {
     const handleWindowResize = () => {
-      if (isElectron()) {
-        setSize({
-          width: window.innerWidth,
-          height: window.innerHeight,
-        });
-        return;
-      }
-
       setPosition((prev) => {
         const maxLeft = Math.max(0, window.innerWidth - size.width - 10);
         const maxTop = Math.max(0, window.innerHeight - size.height - 10);
@@ -450,9 +335,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 
   // Window drag handlers with 4px drag movement threshold to preserve click handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    // In Electron native mode, window dragging is managed natively by OS via -webkit-app-region: drag
-    if (isElectron()) return;
-
     // Only respond to primary mouse button (left-click)
     if (e.button !== 0) return;
 
@@ -667,40 +549,22 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
 
     return (
       <div
-        style={
-          isElectron()
-            ? {
-                position: 'relative',
-                width: '100vw',
-                height: '100vh',
-                zIndex: isPinned ? 9999 : 50,
-                opacity: settings.cardOpacity,
-              }
-            : {
-                position: 'fixed',
-                left: `${position.x}px`,
-                top: `${position.y}px`,
-                width: `${pillWidth}px`,
-                height: `${pillHeight}px`,
-                zIndex: isPinned ? 9999 : 50,
-                opacity: settings.cardOpacity,
-              }
-        }
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: `${pillWidth}px`,
+          height: `${pillHeight}px`,
+          zIndex: isPinned ? 9999 : 50,
+          opacity: settings.cardOpacity,
+        }}
         onMouseDown={handleMouseDown}
-        className={`select-none app-region-drag animate-in zoom-in-95 duration-150 rounded-full backdrop-blur-3xl border text-white flex items-center px-2 sm:px-2.5 gap-1.5 relative overflow-hidden group transition-[transform,box-shadow,border-color] duration-300 ease-out apple-liquid-pill ${
+        className={`select-none animate-in zoom-in-95 duration-150 rounded-full backdrop-blur-3xl bg-slate-950/85 border text-white flex items-center px-2 sm:px-2.5 gap-1.5 relative overflow-hidden group transition-[transform,box-shadow,border-color] duration-300 ease-out ${
           isDragging
-            ? `scale-[1.03] ${isElectron() ? 'shadow-none' : 'shadow-[0_38px_85px_rgba(0,0,0,0.85),0_15px_30px_rgba(0,0,0,0.5),0_0_28px_rgba(59,130,246,0.35)]'} border-white/40 ring-1 ring-blue-400/40 cursor-grabbing`
-            : `scale-100 ${isElectron() ? 'shadow-none' : 'shadow-[0_20px_50px_rgba(0,0,0,0.6)]'} border-white/20 cursor-grab hover:shadow-[0_25px_60px_rgba(0,0,0,0.65)]`
+            ? 'scale-[1.03] shadow-[0_38px_85px_rgba(0,0,0,0.85),0_15px_30px_rgba(0,0,0,0.5),0_0_28px_rgba(59,130,246,0.35)] border-white/40 ring-1 ring-blue-400/40 cursor-grabbing'
+            : 'scale-100 shadow-[0_20px_50px_rgba(0,0,0,0.6)] border-white/20 cursor-grab hover:shadow-[0_25px_60px_rgba(0,0,0,0.65)]'
         }`}
       >
-        {/* Auto-detected notification for pill mode */}
-        {autoDetectedInfo && (
-          <div className="no-drag absolute -top-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-600/90 text-white text-[11px] shadow-lg border border-white/20 whitespace-nowrap animate-in fade-in duration-200 pointer-events-none select-none">
-            <Sparkles className="w-3 h-3 text-amber-300 animate-pulse shrink-0" />
-            <span>自动识别: {autoDetectedInfo.flag} {autoDetectedInfo.langCode}</span>
-          </div>
-        )}
-
         {/* 最左侧圆角区域：悬停最左侧圆角区域自动弹出来，左边收缩为翻译让位 */}
         <div
           onMouseEnter={() => {
@@ -782,7 +646,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
             type="text"
             value={sourceText}
             onChange={(e) => onSourceTextChange(e.target.value)}
-            onPaste={handleSourcePaste}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
             onKeyDown={(e) => {
@@ -1062,28 +925,24 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
           </div>
         )}
 
-        {/* 边缘拉伸：左右拉伸药丸宽度，向下大幅拖拽拉伸展开回卡片，向上推缩小高度 (仅在 Web 仿真桌面渲染) */}
-        {!isElectron() && (
-          <>
-            <div
-              onMouseDown={(e) => {
-                handleResizeMouseDown(e, 's');
-              }}
-              className="resize-handle absolute left-8 right-8 -bottom-1 h-3 cursor-ns-resize hover:bg-blue-400/20 active:bg-blue-400/40 rounded-b-full transition-colors z-20"
-              title="向上推缩小药丸高度，大幅向下拖动展开为卡片"
-            />
-            <div
-              onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
-              className="resize-handle absolute -right-1 top-2 bottom-2 w-2.5 cursor-ew-resize hover:bg-blue-400/20 active:bg-blue-400/40 rounded-r-full transition-colors z-20"
-              title="左右拖动调整药丸宽度"
-            />
-            <div
-              onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
-              className="resize-handle absolute -left-1 top-2 bottom-2 w-2.5 cursor-ew-resize hover:bg-blue-400/20 active:bg-blue-400/40 rounded-l-full transition-colors z-20"
-              title="左右拖动调整药丸宽度"
-            />
-          </>
-        )}
+        {/* 边缘拉伸：左右拉伸药丸宽度，向下大幅拖拽拉伸展开回卡片，向上推缩小高度 */}
+        <div
+          onMouseDown={(e) => {
+            handleResizeMouseDown(e, 's');
+          }}
+          className="resize-handle absolute left-8 right-8 -bottom-1 h-3 cursor-ns-resize hover:bg-blue-400/20 active:bg-blue-400/40 rounded-b-full transition-colors z-20"
+          title="向上推缩小药丸高度，大幅向下拖动展开为卡片"
+        />
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
+          className="resize-handle absolute -right-1 top-2 bottom-2 w-2.5 cursor-ew-resize hover:bg-blue-400/20 active:bg-blue-400/40 rounded-r-full transition-colors z-20"
+          title="左右拖动调整药丸宽度"
+        />
+        <div
+          onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
+          className="resize-handle absolute -left-1 top-2 bottom-2 w-2.5 cursor-ew-resize hover:bg-blue-400/20 active:bg-blue-400/40 rounded-l-full transition-colors z-20"
+          title="左右拖动调整药丸宽度"
+        />
       </div>
     );
   }
@@ -1091,54 +950,30 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
   // 2. Full Floating Translator Card with Dynamic Resizing
   return (
     <div
-      style={
-        isElectron()
-          ? {
-              position: 'relative',
-              width: '100vw',
-              height: '100vh',
-              maxWidth: '100vw',
-              maxHeight: '100vh',
-              zIndex: isPinned ? 9999 : 40,
-              opacity: settings.cardOpacity,
-            }
-          : {
-              position: 'fixed',
-              left: `${position.x}px`,
-              top: `${position.y}px`,
-              width: `${size.width}px`,
-              height: `${size.height}px`,
-              maxWidth: 'calc(100vw - 20px)',
-              maxHeight: 'calc(100vh - 35px)',
-              zIndex: isPinned ? 9999 : 40,
-              opacity: settings.cardOpacity,
-            }
-      }
-      className={`apple-liquid-glass backdrop-blur-3xl border overflow-hidden ${
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        maxWidth: 'calc(100vw - 20px)',
+        maxHeight: 'calc(100vh - 35px)',
+        zIndex: isPinned ? 9999 : 40,
+        opacity: settings.cardOpacity,
+      }}
+      className={`bg-white/10 backdrop-blur-3xl border ${
         isMinimal ? 'rounded-2xl' : 'rounded-[32px]'
       } flex flex-col relative z-10 select-none transition-[transform,box-shadow,border-color,opacity] duration-300 ease-out ${
         isDragging
-          ? `scale-[1.018] ${isElectron() ? 'shadow-none' : 'shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85),0_30px_60px_-10px_rgba(0,0,0,0.5),0_0_35px_rgba(59,130,246,0.25)]'} border-white/35 ring-1 ring-blue-400/30`
-          : `scale-100 ${isElectron() ? 'shadow-none' : 'shadow-[0_28px_65px_-15px_rgba(0,0,0,0.58),0_10px_25px_-5px_rgba(0,0,0,0.3)]'} border-white/20`
+          ? 'scale-[1.018] shadow-[0_55px_120px_-15px_rgba(0,0,0,0.85),0_30px_60px_-10px_rgba(0,0,0,0.5),0_0_35px_rgba(59,130,246,0.25)] border-white/35 ring-1 ring-blue-400/30'
+          : 'scale-100 shadow-[0_28px_65px_-15px_rgba(0,0,0,0.58),0_10px_25px_-5px_rgba(0,0,0,0.3)] border-white/20'
       }`}
     >
-      {/* Auto-detected notification badge for card mode */}
-      {autoDetectedInfo && (
-        <div className="no-drag absolute top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600/90 text-white text-xs font-medium shadow-xl backdrop-blur-md border border-white/20 animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none select-none">
-          <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
-          <span>已自动识别源语言:</span>
-          <span className="font-semibold text-white flex items-center gap-1">
-            <span>{autoDetectedInfo.flag}</span>
-            <span>{autoDetectedInfo.langName}</span>
-          </span>
-        </div>
-      )}
-
-      {/* Top Header Bar (保持内容一致性，紧凑排版，支持原生与仿真平滑拖拽) */}
+      {/* Top Header Bar (保持内容一致性，紧凑排版，图标永不丢失) */}
       {!isMinimal && (
         <div
           onMouseDown={handleMouseDown}
-          className={`app-region-drag relative z-30 w-full max-w-full overflow-hidden ${
+          className={`relative z-30 w-full max-w-full overflow-hidden ${
             isUltraCompact
               ? 'px-2 py-1'
               : isVeryCompact
@@ -1151,31 +986,21 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         {/* Traffic Light Dots */}
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className={`no-drag app-region-no-drag relative z-30 flex items-center shrink-0 ${isUltraCompact ? 'gap-1' : 'gap-1.5'}`}
+          className={`no-drag relative z-30 flex items-center shrink-0 ${isUltraCompact ? 'gap-1' : 'gap-1.5'}`}
         >
           <button
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={() => onSourceTextChange('')}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              closeWindow();
-            }}
             className={`${isUltraCompact ? 'w-2 h-2' : isVeryCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'} rounded-full bg-red-400/80 shadow-xs hover:opacity-100 opacity-80 transition-opacity cursor-pointer`}
-            title="清空内容 (右键隐藏至系统托盘)"
+            title="清空内容"
           />
           <button
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={() => setIsMinimized(true)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              minimizeWindow();
-            }}
             className={`${isUltraCompact ? 'w-2 h-2' : isVeryCompact ? 'w-2.5 h-2.5' : 'w-3 h-3'} rounded-full bg-amber-400/80 shadow-xs hover:opacity-100 opacity-80 transition-opacity cursor-pointer`}
-            title="收起为药丸胶囊 (右键最小化窗口)"
+            title="收起为药丸形状"
           />
           <button
             type="button"
@@ -1584,7 +1409,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
             onMouseEnter={() => setIsCardSearchHovered(true)}
             onMouseLeave={() => setIsCardSearchHovered(false)}
             onMouseDown={(e) => e.stopPropagation()}
-            onPaste={handleSourcePaste as any}
             onClick={() => {
               setIsCardInputFocused(true);
               setTimeout(() => cardInputRef.current?.focus(), 20);
@@ -1598,7 +1422,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
                   ref={cardInputRef}
                   value={sourceText}
                   onChange={(e) => onSourceTextChange(e.target.value)}
-                  onPaste={handleSourcePaste}
                   onBlur={() => setIsCardInputFocused(false)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -1712,7 +1535,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
         <div
           onMouseEnter={() => setIsCardSearchHovered(true)}
           onMouseLeave={() => setIsCardSearchHovered(false)}
-          onPaste={handleSourcePaste as any}
           onClick={() => {
             if (!isCardInputFocused) {
               setIsCardInputFocused(true);
@@ -1730,7 +1552,6 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
                 ref={cardInputRef as any}
                 value={sourceText}
                 onChange={(e) => onSourceTextChange(e.target.value)}
-                onPaste={handleSourcePaste}
                 onBlur={() => setIsCardInputFocused(false)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1941,66 +1762,63 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
       )}
 
       {/* =========================================================================
-          8 方向全角度拉伸与四角缩放手柄（仅在 Web 仿真桌面渲染，桌面端由 OS 原生边框拉伸）
+          8 方向全角度拉伸与四角缩放手柄（高灵敏拖动调节尺寸）
+          四角的小尖尖均已彻底隐藏，纯净简约玻璃外观，仍支持平滑拉伸手柄交互
           ========================================================================= */}
-      {!isElectron() && (
-        <>
-          {/* 1. 四个角 (NW, NE, SW, SE) 无视觉尖尖标记，纯净拖拽 */}
-          {/* 右下角 (SE) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
-            className="resize-handle absolute -right-1.5 -bottom-1.5 w-5 h-5 cursor-nwse-resize rounded-br-[32px] transition-colors z-20"
-            title="拖动右下角调节大小"
-          />
+      {/* 1. 四个角 (NW, NE, SW, SE) 无视觉尖尖标记，纯净拖拽 */}
+      {/* 右下角 (SE) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+        className="resize-handle absolute -right-1.5 -bottom-1.5 w-5 h-5 cursor-nwse-resize rounded-br-[32px] transition-colors z-20"
+        title="拖动右下角调节大小"
+      />
 
-          {/* 左下角 (SW) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
-            className="resize-handle absolute -left-1.5 -bottom-1.5 w-5 h-5 cursor-nesw-resize rounded-bl-[32px] transition-colors z-20"
-            title="拖动左下角调节大小"
-          />
+      {/* 左下角 (SW) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
+        className="resize-handle absolute -left-1.5 -bottom-1.5 w-5 h-5 cursor-nesw-resize rounded-bl-[32px] transition-colors z-20"
+        title="拖动左下角调节大小"
+      />
 
-          {/* 右上角 (NE) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
-            className="resize-handle absolute -right-1.5 -top-1.5 w-4 h-4 cursor-nesw-resize rounded-tr-[32px] transition-colors z-20"
-            title="拖动右上角调节大小"
-          />
+      {/* 右上角 (NE) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
+        className="resize-handle absolute -right-1.5 -top-1.5 w-4 h-4 cursor-nesw-resize rounded-tr-[32px] transition-colors z-20"
+        title="拖动右上角调节大小"
+      />
 
-          {/* 左上角 (NW) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
-            className="resize-handle absolute -left-1.5 -top-1.5 w-4 h-4 cursor-nwse-resize rounded-tl-[32px] transition-colors z-20"
-            title="拖动左上角调节大小"
-          />
+      {/* 左上角 (NW) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
+        className="resize-handle absolute -left-1.5 -top-1.5 w-4 h-4 cursor-nwse-resize rounded-tl-[32px] transition-colors z-20"
+        title="拖动左上角调节大小"
+      />
 
-          {/* 2. 四条边 (E, W, S, N) */}
-          {/* 右侧边 (E) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
-            className="resize-handle absolute -right-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-r-full transition-colors z-30"
-            title="向左右拉伸调节宽度"
-          />
-          {/* 底部边 (S) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 's')}
-            className="resize-handle absolute left-8 right-8 -bottom-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-b-full transition-colors z-30"
-            title="向上下拉伸调节高度"
-          />
-          {/* 左侧边 (W) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
-            className="resize-handle absolute -left-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-l-full transition-colors z-30"
-            title="向左右拉伸调节宽度"
-          />
-          {/* 顶部边 (N) */}
-          <div
-            onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
-            className="resize-handle absolute left-8 right-8 -top-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-t-full transition-colors z-30"
-            title="向上下拉伸调节高度"
-          />
-        </>
-      )}
+      {/* 2. 四条边 (E, W, S, N) */}
+      {/* 右侧边 (E) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
+        className="resize-handle absolute -right-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-r-full transition-colors z-30"
+        title="向左右拉伸调节宽度"
+      />
+      {/* 底部边 (S) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 's')}
+        className="resize-handle absolute left-8 right-8 -bottom-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-b-full transition-colors z-30"
+        title="向上下拉伸调节高度"
+      />
+      {/* 左侧边 (W) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
+        className="resize-handle absolute -left-1.5 top-8 bottom-8 w-3 cursor-ew-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-l-full transition-colors z-30"
+        title="向左右拉伸调节宽度"
+      />
+      {/* 顶部边 (N) */}
+      <div
+        onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
+        className="resize-handle absolute left-8 right-8 -top-1.5 h-3 cursor-ns-resize hover:bg-blue-400/25 active:bg-blue-400/40 rounded-t-full transition-colors z-30"
+        title="向上下拉伸调节高度"
+      />
     </div>
   );
 };
