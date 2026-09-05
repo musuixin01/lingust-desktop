@@ -47,3 +47,6 @@ Thumbs.db
 user_screenshot*.png
 target_effect.png
 current_state.png
+
+# Debug screenshots
+*.png
