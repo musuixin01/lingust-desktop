@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QQuickWindow>
+#include <QPropertyAnimation>
 
 class TranslatorWindow : public QQuickWindow
 {
@@ -33,6 +34,7 @@ public:
     Q_INVOKABLE void expandToCard();
     Q_INVOKABLE void collapseToPill();
     Q_INVOKABLE void setContentItem(QQuickItem *item);
+    Q_INVOKABLE void animateSize(int w, int h, int duration = 250);
 
 signals:
     void currentModeChanged();
@@ -59,4 +61,6 @@ private:
     int m_cardWidth;
     int m_cardHeight;
     bool m_dwmApplied;
+    QPropertyAnimation *m_widthAnim;
+    QPropertyAnimation *m_heightAnim;
 };

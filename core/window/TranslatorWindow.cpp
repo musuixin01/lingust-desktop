@@ -4,6 +4,7 @@
 #include <QScreen>
 #include <QQuickItem>
 #include <QResizeEvent>
+#include <QParallelAnimationGroup>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -79,7 +80,11 @@ TranslatorWindow::TranslatorWindow(QWindow *parent)
     , m_cardWidth(380)
     , m_cardHeight(490)
     , m_dwmApplied(false)
+    , m_widthAnim(new QPropertyAnimation(this, "width", this))
+    , m_heightAnim(new QPropertyAnimation(this, "height", this))
 {
+    m_widthAnim->setEasingCurve(QEasingCurve::OutCubic);
+    m_heightAnim->setEasingCurve(QEasingCurve::OutCubic);
     setupWindow();
 }
 
@@ -158,13 +163,11 @@ void TranslatorWindow::setCurrentMode(const QString &mode)
     emit currentModeChanged();
 
     if (mode == "pill") {
-        setWidth(m_pillWidth);
-        setHeight(m_pillHeight);
         setMinimumHeight(38);
+        setMaximumHeight(60);
     } else {
-        setWidth(m_cardWidth);
-        setHeight(m_cardHeight);
         setMinimumHeight(95);
+        setMaximumHeight(16777215);
     }
 }
 
@@ -176,7 +179,6 @@ void TranslatorWindow::setPillWidth(int w)
     if (m_pillWidth == w) return;
     m_pillWidth = w;
     emit pillWidthChanged();
-    if (m_currentMode == "pill") setWidth(w);
 }
 
 int TranslatorWindow::pillHeight() const { return m_pillHeight; }
@@ -185,7 +187,6 @@ void TranslatorWindow::setPillHeight(int h)
     if (m_pillHeight == h) return;
     m_pillHeight = h;
     emit pillHeightChanged();
-    if (m_currentMode == "pill") setHeight(h);
 }
 
 int TranslatorWindow::cardWidth() const { return m_cardWidth; }
@@ -194,7 +195,6 @@ void TranslatorWindow::setCardWidth(int w)
     if (m_cardWidth == w) return;
     m_cardWidth = w;
     emit cardWidthChanged();
-    if (m_currentMode == "card") setWidth(w);
 }
 
 int TranslatorWindow::cardHeight() const { return m_cardHeight; }
@@ -203,26 +203,58 @@ void TranslatorWindow::setCardHeight(int h)
     if (m_cardHeight == h) return;
     m_cardHeight = h;
     emit cardHeightChanged();
-    if (m_currentMode == "card") setHeight(h);
+}
+
+void TranslatorWindow::animateSize(int w, int h, int duration)
+{
+    m_widthAnim->stop();
+    m_heightAnim->stop();
+    m_widthAnim->setDuration(duration);
+    m_heightAnim->setDuration(duration);
+    m_widthAnim->setStartValue(width());
+    m_heightAnim->setStartValue(height());
+    m_widthAnim->setEndValue(w);
+    m_heightAnim->setEndValue(h);
+    m_widthAnim->start();
+    m_heightAnim->start();
 }
 
 void TranslatorWindow::toggleMode()
 {
-    setCurrentMode(m_currentMode == "pill" ? "card" : "pill");
+    if (m_currentMode == "pill") {
+        expandToCard();
+    } else {
+        collapseToPill();
+    }
 }
 
 void TranslatorWindow::expandToCard()
 {
-    // 保存当前药丸位置，展开时保持左上角对齐
+    // Web 端逻辑：展开时保持当前宽度（至少380），高度设为490
+    int targetWidth = qMax(width(), 380);
+    int targetHeight = 490;
+
+    m_cardWidth = targetWidth;
+    m_cardHeight = targetHeight;
+
     QPoint pos = position();
     setCurrentMode("card");
+    animateSize(targetWidth, targetHeight, 280);
     setPosition(pos);
 }
 
 void TranslatorWindow::collapseToPill()
 {
+    // Web 端逻辑：收起时保持当前宽度（至少160），高度设为46
+    int targetWidth = qMax(width(), 160);
+    int targetHeight = 46;
+
+    m_pillWidth = targetWidth;
+    m_pillHeight = targetHeight;
+
     QPoint pos = position();
     setCurrentMode("pill");
+    animateSize(targetWidth, targetHeight, 250);
     setPosition(pos);
 }
 

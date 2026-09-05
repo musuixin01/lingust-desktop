@@ -10,6 +10,8 @@
 
 #include "core/state/AppState.h"
 #include "core/window/TranslatorWindow.h"
+#include "core/window/TrayManager.h"
+#include "platform/windows/hotkey/HotkeyManager.h"
 
 Application::Application(QObject *parent)
     : QObject(parent)
@@ -22,10 +24,13 @@ int Application::run()
 {
     m_appState = std::make_unique<AppState>();
     m_window = std::make_unique<TranslatorWindow>();
+    m_tray = std::make_unique<TrayManager>();
+    m_hotkey = std::make_unique<HotkeyManager>();
 
     m_engine = std::make_unique<QQmlApplicationEngine>();
     m_engine->rootContext()->setContextProperty("appState", m_appState.get());
     m_engine->rootContext()->setContextProperty("translatorWindow", m_window.get());
+    m_engine->rootContext()->setContextProperty("trayManager", m_tray.get());
 
     QObject::connect(
         m_engine.get(), &QQmlApplicationEngine::objectCreationFailed,
@@ -37,6 +42,24 @@ int Application::run()
         QUrl("qrc:/qt/qml/Linguist/ui/components/DesignTokens.qml"),
         "Linguist", 1, 0, "DesignTokens"
     );
+
+    // 托盘菜单信号连接
+    QObject::connect(m_tray.get(), &TrayManager::showRequested, m_window.get(), &TranslatorWindow::show);
+    QObject::connect(m_tray.get(), &TrayManager::hideRequested, m_window.get(), &TranslatorWindow::hide);
+    QObject::connect(m_tray.get(), &TrayManager::quitRequested, QGuiApplication::instance(), &QGuiApplication::quit);
+    QObject::connect(m_tray.get(), &TrayManager::screenshotRequested, m_appState.get(), &AppState::triggerSelectionTranslation);
+
+    // 全局快捷键
+    // Ctrl+Shift+T: 划词翻译
+    m_hotkey->registerHotkey(1, Qt::Key_T, Qt::ControlModifier | Qt::ShiftModifier);
+    // Ctrl+Shift+S: 截图翻译（暂用划词代替）
+    m_hotkey->registerHotkey(2, Qt::Key_S, Qt::ControlModifier | Qt::ShiftModifier);
+    QObject::connect(m_hotkey.get(), &HotkeyManager::hotkeyTriggered, m_appState.get(), [this](int id) {
+        if (id == 1 || id == 2) {
+            m_window->show();
+            m_appState->triggerSelectionTranslation();
+        }
+    });
 
     // 加载主 QML 到 TranslatorWindow
     fprintf(stderr, "[DEBUG] Loading QML module...\n");
@@ -68,5 +91,6 @@ int Application::run()
     }
 
     m_window->show();
+    m_tray->show();
     return QGuiApplication::exec();
 }

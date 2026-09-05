@@ -5,9 +5,9 @@ QtObject {
     id: tokens
 
     // === Surfaces (灰白深灰，无蓝调，85%透明) ===
-    readonly property color bgCard: "#cc2a2a2e"
+    readonly property color bgCard: "#f2686870"
     readonly property color bgSubtle: "#00000000"
-    readonly property color bgPill: "#ff020617"
+    readonly property color bgPill: "#ff0a0a0a"
     readonly property color bgDark: "#ff0c0c0e"
     readonly property color bgInput: "#00000000"
     readonly property color bgInputFocus: "#1affffff"

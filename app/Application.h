@@ -6,6 +6,8 @@
 class QQmlApplicationEngine;
 class AppState;
 class TranslatorWindow;
+class TrayManager;
+class HotkeyManager;
 
 class Application : public QObject
 {
@@ -20,4 +22,6 @@ private:
     std::unique_ptr<QQmlApplicationEngine> m_engine;
     std::unique_ptr<AppState> m_appState;
     std::unique_ptr<TranslatorWindow> m_window;
+    std::unique_ptr<TrayManager> m_tray;
+    std::unique_ptr<HotkeyManager> m_hotkey;
 };

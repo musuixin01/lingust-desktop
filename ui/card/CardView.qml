@@ -6,7 +6,7 @@ Item {
     id: card
 
     property bool isDragging: false
-    property bool isMinimal: height <= 145 || (width <= 240 && height <= 190)
+    property bool isMinimal: height <= 130 || (width <= 220 && height <= 160)
     property bool isUltraCompact: !isMinimal && (width < 280 || height < 260)
     property bool isVeryCompact: !isMinimal && (width < 340 || height < 330)
     property bool isCompact: !isMinimal && (width < 420 || height < 400)
@@ -15,6 +15,7 @@ Item {
 
     signal collapseRequested()
     signal translateRequested()
+    signal settingsRequested()
 
     // === 毛玻璃背景 ===
     GlassSurface {
@@ -100,7 +101,7 @@ Item {
                     IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"; iconColor: "#cc60a5fa"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14) }
                     IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/pin.svg"; active: appState.isPinned; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14); onClicked: appState.setIsPinned(!appState.isPinned) }
                     IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/type.svg"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14) }
-                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/settings.svg"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14) }
+                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/settings.svg"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14); onClicked: card.settingsRequested() }
                 }
             }
 
@@ -161,15 +162,19 @@ Item {
             }
 
             // --- 标准/紧凑模式 ---
-            ScrollView {
+            Flickable {
+                id: flickable
                 anchors.fill: parent
-                anchors.margins: dynamicTight ? 8 : (dynamicCompact ? 10 : 14)
-                visible: !card.isMinimal
                 clip: true
-                ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+                contentWidth: width
+                contentHeight: contentColumn.implicitHeight + (dynamicTight ? 16 : (dynamicCompact ? 20 : 28))
+                boundsBehavior: Flickable.StopAtBounds
 
                 ColumnLayout {
-                    width: parent.width
+                    id: contentColumn
+                    x: dynamicTight ? 8 : (dynamicCompact ? 10 : 14)
+                    y: dynamicTight ? 8 : (dynamicCompact ? 10 : 14)
+                    width: flickable.width - (dynamicTight ? 16 : (dynamicCompact ? 20 : 28))
                     spacing: dynamicTight ? 4 : (dynamicCompact ? 8 : 12)
 
                     SearchInput {
@@ -279,47 +284,59 @@ Item {
                         }
                     }
 
-                    // 操作工具栏
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 28
-                        Layout.topMargin: 4
-                        color: "transparent"
-                        visible: !appState.isLoading && appState.translatedText.length > 0
-
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: 4
-
-                            Text {
-                                Layout.alignment: Qt.AlignVCenter
-                                text: appState.sourceLang + "➔" + appState.targetLang
-                                color: "#cc60a5fa"
-                                font.pixelSize: 10
-                                font.family: "Consolas"
-                            }
-
-                            Item { Layout.fillWidth: true }
-
-                            IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/copy.svg"; iconSize: 14 }
-                            IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"; iconSize: 14 }
-                            IconButton {
-                                iconSource: "qrc:/qt/qml/Linguist/resources/icons/heart.svg"
-                                iconSize: 14
-                                active: appState.isFavorite
-                                activeColor: DesignTokens.accentAmber
-                                onClicked: appState.setIsFavorite(!appState.isFavorite)
-                            }
-                            IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/history.svg"; iconSize: 14 }
-                        }
-
-                        Rectangle {
-                            anchors.left: parent.left; anchors.right: parent.right
-                            anchors.top: parent.top
-                            height: 1; color: DesignTokens.borderSubtle
-                        }
-                    }
+                    Item { Layout.fillWidth: true; Layout.preferredHeight: dynamicTight ? 8 : (dynamicCompact ? 10 : 14) }
                 }
+            }
+        }
+
+        // ========== 操作工具栏（固定在底部栏上方）==========
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 32
+            color: "transparent"
+            visible: !card.isMinimal && !appState.isLoading && appState.translatedText.length > 0
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                spacing: 4
+
+                Text {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: appState.sourceLang + "➔" + appState.targetLang
+                    color: "#cc60a5fa"
+                    font.pixelSize: 10
+                    font.family: "Consolas"
+                }
+
+                Item { Layout.fillWidth: true }
+
+                IconButton {
+                    iconSource: "qrc:/qt/qml/Linguist/resources/icons/copy.svg"
+                    iconSize: 14
+                    iconColor: appState.justCopied ? "#4ade80" : "#ccffffff"
+                    onClicked: appState.copyTranslation()
+                }
+                IconButton {
+                    iconSource: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
+                    iconSize: 14
+                    onClicked: appState.speak(appState.sourceText, appState.sourceLang)
+                }
+                IconButton {
+                    iconSource: "qrc:/qt/qml/Linguist/resources/icons/heart.svg"
+                    iconSize: 14
+                    active: appState.isFavorite
+                    activeColor: DesignTokens.accentAmber
+                    onClicked: appState.setIsFavorite(!appState.isFavorite)
+                }
+                IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/history.svg"; iconSize: 14 }
+            }
+
+            Rectangle {
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.top: parent.top
+                height: 1; color: DesignTokens.borderSubtle
             }
         }
 
@@ -383,14 +400,4 @@ Item {
             }
         }
     }
-
-    // ========== 8向拉伸手柄 ==========
-    Rectangle { anchors.right: parent.right; anchors.bottom: parent.bottom; width: 20; height: 20; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeFDiagCursor } }
-    Rectangle { anchors.left: parent.left; anchors.bottom: parent.bottom; width: 20; height: 20; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeBDiagCursor } }
-    Rectangle { anchors.right: parent.right; anchors.top: parent.top; width: 16; height: 16; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeBDiagCursor } }
-    Rectangle { anchors.left: parent.left; anchors.top: parent.top; width: 16; height: 16; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeFDiagCursor } }
-    Rectangle { anchors.right: parent.right; anchors.top: parent.top; anchors.topMargin: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 32; width: 12; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeHorCursor } }
-    Rectangle { anchors.left: parent.left; anchors.top: parent.top; anchors.topMargin: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 32; width: 12; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeHorCursor } }
-    Rectangle { anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.leftMargin: 32; anchors.right: parent.right; anchors.rightMargin: 32; height: 12; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeVerCursor } }
-    Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.leftMargin: 32; anchors.right: parent.right; anchors.rightMargin: 32; height: 12; color: "transparent"; z: 20; MouseArea { anchors.fill: parent; cursorShape: Qt.SizeVerCursor } }
 }

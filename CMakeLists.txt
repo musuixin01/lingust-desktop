@@ -14,6 +14,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
     QuickControls2
     Network
     Sql
+    Widgets
 )
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -30,6 +31,28 @@ set(SOURCES
     core/state/AppState.h
     core/window/TranslatorWindow.cpp
     core/window/TranslatorWindow.h
+    core/translation/TranslationManager.cpp
+    core/translation/TranslationManager.h
+    providers/ITranslationProvider.h
+    providers/gemini/GeminiProvider.cpp
+    providers/gemini/GeminiProvider.h
+    providers/deepl/DeepLProvider.cpp
+    providers/deepl/DeepLProvider.h
+    providers/youdao/YoudaoProvider.cpp
+    providers/youdao/YoudaoProvider.h
+    infrastructure/database/DatabaseManager.cpp
+    infrastructure/database/DatabaseManager.h
+    core/selection/SelectionManager.cpp
+    core/selection/SelectionManager.h
+    core/window/TrayManager.cpp
+    core/window/TrayManager.h
+    core/capture/CaptureManager.cpp
+    core/capture/CaptureManager.h
+    core/ocr/OcrManager.cpp
+    core/ocr/OcrManager.h
+    providers/ocr/IOcrProvider.h
+    platform/windows/hotkey/HotkeyManager.cpp
+    platform/windows/hotkey/HotkeyManager.h
 )
 
 qt_add_executable(lingust ${SOURCES})
@@ -49,6 +72,7 @@ qt_add_qml_module(lingust
         ui/card/CardView.qml
         ui/card/WordDetailView.qml
         ui/card/SearchInput.qml
+        ui/settings/SettingsView.qml
     RESOURCES
         ui/components/DesignTokens.qml
         resources/icons/crop.svg
@@ -77,6 +101,7 @@ target_link_libraries(lingust PRIVATE
     Qt6::QuickControls2
     Qt6::Network
     Qt6::Sql
+    Qt6::Widgets
 )
 
 if(WIN32)
