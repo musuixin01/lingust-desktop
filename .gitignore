@@ -1,8 +1,49 @@
-node_modules/
+# Build directories
 build/
-dist/
-coverage/
-.DS_Store
+build-*/
+cmake-build-*/
+out/
+
+# Qt generated files
+*.user
+*.user.*
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.moc
+*.qmlc
+*.jsc
+
+# Compiled output
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Debug files
+*.pdb
+*.ilk
 *.log
-.env*
-!.env.example
+stderr*.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.bak
+user_screenshot*.png
+target_effect.png
+current_state.png

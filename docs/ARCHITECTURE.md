@@ -1,54 +1,221 @@
-# Linguist 系统架构与技术实现方案
+# Linguist 桌面版系统架构
 
-## 1. 系统分层架构
+> **版本**：v0.1.0
+> **最后更新**：2026-09-05
+
+## 1. 分层架构
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      用户界面层 (Presentation)               │
-│  - 桌面悬浮卡片 (FloatingTranslatorCard)                      │
-│  - 原位截图卡片 (InPlaceScreenshotCard)                      │
-│  - 划词快捷气泡 (SelectionTooltip)                           │
-│  - 生词本抽屉 / 设置中心 / 桌面模拟器                         │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ React 状态管理 / Hooks
-┌──────────────────────────────▼──────────────────────────────┐
-│                      业务服务层 (Services & Hooks)           │
-│  - translationService: 统一多引擎请求调度与离线降级          │
-│  - ocrService: 截图 OCR 数据清洗与对齐                      │
-│  - storageService: 本地持久化与生词本管理                   │
-│  - useDraggable: 桌面边界吸附与平滑阻尼拖动                  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ RESTful API (JSON over HTTP)
-┌──────────────────────────────▼──────────────────────────────┐
-│                   服务端代理与中间件 (Express + Node)         │
-│  - /api/translate: 多模型并发负载与 429 容灾熔断             │
-│  - /api/ocr-translate: 多模态视觉图文精准对齐                │
-│  - /api/test-engine: 引擎可用性心跳探针                      │
-└──────┬───────────────────────┬───────────────────────┬──────┘
-       │                       │                       │
-┌──────▼──────┐         ┌──────▼──────┐         ┌──────▼──────┐
-│  Gemini AI  │         │  DeepL API  │         │  有道智云   │
-│ (GoogleGenAI│         │ (Free & Pro)│         │ (OpenAPI v3)│
-└─────────────┘         └─────────────┘         └─────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   UI 层 (Qt Quick / QML)                 │
+│  PillView / CardView / OverlayWindow / SettingsWindow    │
+│  DesignTokens / GlassSurface / HoverScrollText / ...     │
+└──────────────────────────┬──────────────────────────────┘
+                           │ property binding / signals
+┌──────────────────────────▼──────────────────────────────┐
+│              Core 核心层 (C++20)                         │
+│  AppState / TranslationManager / SelectionManager        │
+│  OCRManager / CaptureManager / WindowManager             │
+│  ShortcutManager / MediaManager                          │
+└──────────────────────────┬──────────────────────────────┘
+                           │ Platform Interfaces
+┌──────────────────────────▼──────────────────────────────┐
+│         Provider 服务层 (可插拔)                          │
+│  ITranslationProvider / IOcrProvider / ISelectionProvider│
+│  Gemini / DeepL / 有道 / OpenAI / Local / PaddleOCR     │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────┐
+│        Windows 平台层 (C++/WinRT + Win32)                │
+│  UI Automation / Graphics.Capture / Clipboard            │
+│  Global Hotkey / Mouse Hook / GSMTC / DWM / DPI         │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────┐
+│        Infrastructure 基础设施                            │
+│  SQLite / Config / Cache / Logging / Updater             │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## 2. 核心技术亮点
+## 2. 窗口管理
 
-### 2.1 429 速率限制智能熔断池 (Smart Model Fallback Pool)
-针对大模型免费/高并发配额超限（HTTP 429）痛点，服务端设计了基于内存时钟的自动冷却机制：
-- 预先配置低延迟、高配额的模型优先级列表：
-  1. `gemini-3.1-flash-lite` (速度极快、消耗极小)
-  2. `gemini-3.5-flash` (兼顾精度与上下文)
-  3. `gemini-flash-lite-latest` (高可用保障)
-  4. `gemini-3.8-flash` (高质量分析)
-- 一旦捕获某模型 429 配额错误，立刻标记该模型冷却 60 秒，无感知自动切换至后续候选模型；
-- 若全部在线模型不可用，静默平滑降级至内置高频双语兜底库与网络公共词典，确保前端永远拿到有效响应。
+### 2.1 窗口清单
 
-### 2.2 原地框选截图与段落结构保真 (In-Place OCR Alignment)
-- 利用前端 `ScreenSnipper` 动态获取截图区域在屏幕坐标系下的 $(X, Y, W, H)$。
-- 截图完成后直接在**截屏原始位置生成同等大小的半透明磨砂卡片**，让用户如同在原地直接看透译文。
-- 多模态提示词强制要求 AI 保留换行符、缩进与段落形态，实现真正的中英逐行严密对齐。
+| 窗口 | 类型 | DWM 背景 | 生命周期 |
+|---|---|---|---|
+| TranslatorWindow | QQuickWindow | Desktop Acrylic | 常驻（药丸/卡片状态切换） |
+| OverlayWindow | QQuickWindow | 半透明遮罩 | 截图时创建 |
+| SettingsWindow | QQuickWindow | Mica | 设置时创建 |
+| HistoryWindow | QQuickWindow | Mica | 历史记录时创建 |
 
-### 2.3 极小尺寸下自适应排版与悬停滚动 (Hover-Scroll)
-- 当卡片缩小至极限高度（$\le 145\text{px}$）或宽度较窄时，自动移除外围冗余控件，聚焦核心“输入框+释义”。
-- 配合 CSS 原生动态 `@keyframes` 与平滑过渡，在鼠标移入时依内容溢出距离自动平滑来回循环滚动，保证小卡片空间利用率达到极致。
+### 2.2 透明窗口实现
+
+```cpp
+// TranslatorWindow 核心设置
+setFlag(Qt::FramelessWindowHint);
+setAttribute(Qt::WA_TranslucentBackground);
+setFlag(Qt::WindowStaysOnTopHint);
+setColor(Qt::transparent);
+
+// DWM Desktop Acrylic (Windows 11 22621+)
+DWM_SYSTEMBACKDROP_TYPE backdrop = DWMSBT_TRANSIENTWINDOW;
+DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop, sizeof(backdrop));
+MARGINS margins = {-1};
+DwmExtendFrameIntoClientArea(hwnd, &margins);
+```
+
+- QML 根元素 `color: "transparent"`，DWM Acrylic 自动模糊桌面背景
+- QML `GlassSurface` 组件叠加半透明颜色 + 圆角 + 边框 + 阴影
+- 圆角外 alpha=0 区域由 Windows layered window 自动实现鼠标穿透
+
+### 2.3 状态机
+
+```
+Pill (380×46)
+  ↓ 点击展开 / 底部下拖 >85px
+Card (380×490)
+  ↓ 点击黄色最小化 / 顶部上推
+Pill
+```
+
+- C++ `TranslatorWindow` 管理 `currentMode` 属性和窗口几何
+- QML `main.qml` 通过 States + Transitions 做视图切换动画
+- 窗口尺寸变化通过 `widthChanged/heightChanged` 信号同步 QML 内容
+
+## 3. 翻译架构
+
+### 3.1 统一接口
+
+```cpp
+class ITranslationProvider {
+public:
+    virtual ~ITranslationProvider() = default;
+    virtual QString name() const = 0;
+    virtual Task<TranslationResult> translate(
+        const QString &text,
+        const QString &sourceLang,
+        const QString &targetLang) = 0;
+    virtual bool isAvailable() const = 0;
+};
+```
+
+### 3.2 提供商实现
+
+| Provider | 类型 | 说明 |
+|---|---|---|
+| GeminiProvider | 云端 | Google GenAI SDK，多模型熔断降级池 |
+| DeepLProvider | 云端 | Free / Pro 密钥 |
+| YoudaoProvider | 云端 | 有道智云 OpenAPI |
+| OpenAIProvider | 云端 | GPT-4o 翻译 |
+| LocalProvider | 离线 | 内置高频双语词库 |
+
+### 3.3 429 熔断降级池
+
+```
+gemini-3.1-flash-lite → gemini-3.5-flash → gemini-flash-lite-latest → gemini-3.8-flash
+    ↓ 全部 429
+LocalProvider 离线兜底
+```
+
+- 捕获 429 后标记模型冷却 60 秒，自动切换下一个候选
+- 全部不可用时降级到离线词库，确保前端永远有响应
+
+## 4. 全局划词
+
+### 4.1 三级降级策略
+
+```
+用户划词
+    ↓
+1. UI Automation (ISelectionProvider / TextPattern)
+   覆盖：Chrome / Edge / Office / PDF 阅读器 / IDE / 传统 Win32
+    ↓ 失败
+2. Clipboard (模拟 Ctrl+C + GetClipboardSequenceNumber 安全恢复)
+   覆盖：部分自绘软件、不支持 UIA 的应用
+    ↓ 失败
+3. OCR (框选区域文字识别)
+   覆盖：游戏、视频、图片等无法获取文本的场景
+```
+
+### 4.2 Clipboard 安全恢复
+
+```
+记录 GetClipboardSequenceNumber() → seq0
+    ↓
+模拟 Ctrl+C
+    ↓
+异步等待 sequence 变化（短超时）
+    ↓
+读取文本
+    ↓
+比对 sequence：
+  - 仍是我们的修改 → 恢复原剪贴板
+  - 被用户插队修改 → 不恢复，避免覆盖用户新内容
+```
+
+## 5. 截图 OCR
+
+### 5.1 流程
+
+```
+快捷键触发
+    ↓
+OverlayWindow 全屏透明遮罩
+    ↓
+鼠标框选区域 (X, Y, W, H)
+    ↓
+Windows.Graphics.Capture 捕获显示器
+    ↓
+裁剪到框选区域
+    ↓
+OCRManager → IOcrProvider
+    ↓
+TranslationManager 翻译
+    ↓
+InPlaceScreenshotCard 原位显示对照结果
+```
+
+### 5.2 OCR Provider
+
+| Provider | 要求 | 说明 |
+|---|---|---|
+| WindowsOcr | Windows 10+ | `Windows.Media.Ocr.OcrEngine`，系统内置，默认 |
+| WindowsAiOcr | NPU 设备 | `Microsoft.Windows.AI.Imaging.TextRecognizer`，高精度可选 |
+| PaddleOcr | 本地运行库 | 高精度离线 OCR，可选分发 |
+
+## 6. 线程模型
+
+```
+Main Thread (UI)
+├── QML 渲染
+├── Window 管理
+└── AppState 状态
+
+Worker Thread Pool (QThreadPool)
+├── OCR 识别
+├── 截图图像处理
+├── API 网络请求
+└── SQLite 数据库
+
+可选 Worker Process
+├── 本地 AI 推理
+├── PaddleOCR
+└── 大模型本地推理
+```
+
+- UI 线程绝不执行 OCR、网络请求和图片处理
+- 所有耗时操作通过 `QThreadPool` + `QRunnable` 或 `QtConcurrent` 执行
+- 结果通过信号槽回传 UI 线程
+
+## 7. 跨平台预留
+
+当前仅实现 Windows 平台，但架构预留跨平台能力：
+
+```
+platform/
+├── interfaces/       # 纯虚接口，平台无关
+├── windows/          # Windows 实现
+└── macos/            # 未来 macOS 实现（预留）
+```
+
+QML UI + C++ Core + Providers 三层完全平台无关，新增平台只需实现 `platform/<os>/` 目录。

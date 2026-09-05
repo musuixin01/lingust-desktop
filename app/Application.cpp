@@ -1,0 +1,72 @@
+#include "Application.h"
+
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQmlError>
+#include <QQuickWindow>
+#include <QQuickItem>
+#include <cstdio>
+
+#include "core/state/AppState.h"
+#include "core/window/TranslatorWindow.h"
+
+Application::Application(QObject *parent)
+    : QObject(parent)
+{
+}
+
+Application::~Application() = default;
+
+int Application::run()
+{
+    m_appState = std::make_unique<AppState>();
+    m_window = std::make_unique<TranslatorWindow>();
+
+    m_engine = std::make_unique<QQmlApplicationEngine>();
+    m_engine->rootContext()->setContextProperty("appState", m_appState.get());
+    m_engine->rootContext()->setContextProperty("translatorWindow", m_window.get());
+
+    QObject::connect(
+        m_engine.get(), &QQmlApplicationEngine::objectCreationFailed,
+        QGuiApplication::instance(), []() { QCoreApplication::exit(-1); },
+        Qt::QueuedConnection);
+
+    // 手动注册 DesignTokens 为 QML 单例（QTP0004 自动生成 qmldir 漏识别 pragma Singleton）
+    qmlRegisterSingletonType(
+        QUrl("qrc:/qt/qml/Linguist/ui/components/DesignTokens.qml"),
+        "Linguist", 1, 0, "DesignTokens"
+    );
+
+    // 加载主 QML 到 TranslatorWindow
+    fprintf(stderr, "[DEBUG] Loading QML module...\n");
+    fflush(stderr);
+
+    QObject::connect(
+        m_engine.get(), &QQmlApplicationEngine::warnings,
+        [](const QList<QQmlError> &warnings) {
+            for (const auto &w : warnings) {
+                fprintf(stderr, "[QML WARNING] %s\n", w.toString().toUtf8().constData());
+            }
+        });
+
+    m_engine->loadFromModule("Linguist", "Main");
+
+    fprintf(stderr, "[DEBUG] QML load called, rootObjects count: %d\n", m_engine->rootObjects().size());
+    fflush(stderr);
+
+    auto rootObjects = m_engine->rootObjects();
+    if (!rootObjects.isEmpty()) {
+        if (auto *item = qobject_cast<QQuickItem *>(rootObjects.first())) {
+            fprintf(stderr, "[DEBUG] Setting content item...\n");
+            fflush(stderr);
+            m_window->setContentItem(item);
+        }
+    } else {
+        fprintf(stderr, "[ERROR] No root objects created! QML load failed.\n");
+        fflush(stderr);
+    }
+
+    m_window->show();
+    return QGuiApplication::exec();
+}
