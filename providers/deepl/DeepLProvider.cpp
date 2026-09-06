@@ -31,6 +31,7 @@ void DeepLProvider::translate(const QString &text, const QString &sourceLang, co
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
     request.setRawHeader("Authorization", QString("DeepL-Auth-Key %1").arg(m_apiKey).toUtf8());
+    request.setTransferTimeout(15000); // 15秒超时
 
     QNetworkReply *reply = m_network->post(request, params.toString(QUrl::FullyEncoded).toUtf8());
     connect(reply, &QNetworkReply::finished, this, &DeepLProvider::onReplyFinished);

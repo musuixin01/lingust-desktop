@@ -4,6 +4,11 @@ build-*/
 cmake-build-*/
 out/
 
+# Large data files (offline dictionary 800MB+)
+data/
+*.db
+*.zip
+
 # Qt generated files
 *.user
 *.user.*
@@ -29,6 +34,7 @@ ui_*.h
 *.ilk
 *.log
 stderr*.txt
+stdout*.txt
 
 # IDE
 .vscode/

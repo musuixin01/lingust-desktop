@@ -33,8 +33,10 @@ public:
     Q_INVOKABLE void toggleMode();
     Q_INVOKABLE void expandToCard();
     Q_INVOKABLE void collapseToPill();
+    Q_INVOKABLE void minimizeToTaskbar();
     Q_INVOKABLE void setContentItem(QQuickItem *item);
     Q_INVOKABLE void animateSize(int w, int h, int duration = 250);
+    Q_INVOKABLE void adjustHeightToContent(int contentHeight);
 
 signals:
     void currentModeChanged();

@@ -5,9 +5,13 @@
 #include <QDebug>
 #include <cstdio>
 #include "Application.h"
+#include "../infrastructure/crash/CrashHandler.h"
 
 int main(int argc, char *argv[])
 {
+    // 最早期初始化崩溃处理器
+    CrashHandler::instance()->init();
+
     // 必须在创建 QApplication 之前设置表面格式，启用 alpha 通道
     QSurfaceFormat format;
     format.setAlphaBufferSize(8);
@@ -25,5 +29,10 @@ int main(int argc, char *argv[])
     QApplication::setQuitOnLastWindowClosed(false);
 
     Application application;
-    return application.run();
+    int result = application.run();
+
+    // 正常退出，清除崩溃标记
+    CrashHandler::instance()->clearCrashFlag();
+
+    return result;
 }

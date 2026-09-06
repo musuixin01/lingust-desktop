@@ -5,47 +5,35 @@ ColumnLayout {
     id: wordDetail
 
     property string word: "Efficient"
-    property string phonetic: "/ɪˈfɪʃnt/"
+    property string phonetic: ""
     property string translatedText: "高效的；有能力的"
+    property string englishDefinition: ""
     property var definitions: []
     property var examples: []
     property var synonyms: []
+    property var antonyms: []
+    property var wordForms: []
+    property var tags: []
     property bool compact: false
     property bool veryCompact: false
     property bool ultraCompact: false
 
     spacing: wordDetail.ultraCompact ? 6 : (wordDetail.veryCompact ? 8 : (wordDetail.compact ? 10 : 12))
 
-    // === 单词标题行 ===
+    // === 音标 + 发音按钮行 ===
     RowLayout {
         Layout.fillWidth: true
-        spacing: 6
+        Layout.preferredHeight: 24
+        spacing: 8
 
-        ColumnLayout {
+        // 音标
+        Text {
             Layout.fillWidth: true
-            spacing: 2
-
-            Row {
-                spacing: 6
-
-                Text {
-                    text: wordDetail.word
-                    color: DesignTokens.textPrimary
-                    font.pixelSize: wordDetail.ultraCompact ? 14 : (wordDetail.veryCompact ? 16 : (wordDetail.compact ? 18 : 20))
-                    font.weight: Font.Bold
-                    font.family: "Segoe UI"
-                    font.letterSpacing: -0.3
-                }
-
-                Text {
-                    text: wordDetail.phonetic
-                    color: "#cc93c5fd"
-                    font.pixelSize: wordDetail.ultraCompact ? 9 : (wordDetail.compact ? 10 : 11)
-                    font.family: "Consolas"
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: wordDetail.phonetic.length > 0
-                }
-            }
+            text: wordDetail.phonetic.length > 0 ? "/" + wordDetail.phonetic + "/" : ""
+            color: "#99ffffff"
+            font.pixelSize: wordDetail.ultraCompact ? 10 : (wordDetail.compact ? 11 : 13)
+            font.family: "Consolas"
+            visible: wordDetail.phonetic.length > 0
         }
 
         // 发音按钮
@@ -55,22 +43,22 @@ ColumnLayout {
 
             Repeater {
                 model: [
-                    { label: "美", color: DesignTokens.accentBlue },
-                    { label: "英", color: DesignTokens.accentEmerald }
+                    { label: "美", accent: "#3b82f6" },
+                    { label: "英", accent: "#10b981" }
                 ]
 
                 delegate: Rectangle {
-                    width: 32; height: 20; radius: 6
+                    width: 36; height: 22; radius: 8
                     color: "#0dffffff"
                     border.color: DesignTokens.borderSubtle
                     border.width: 1
 
                     Row {
                         anchors.centerIn: parent
-                        spacing: 2
+                        spacing: 3
                         Image {
                             source: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
-                            sourceSize.width: 10; sourceSize.height: 10
+                            sourceSize.width: 11; sourceSize.height: 11
                         }
                         Text {
                             text: modelData.label
@@ -86,11 +74,51 @@ ColumnLayout {
                         hoverEnabled: true
                         onEntered: parent.color = "#26ffffff"
                         onExited: parent.color = "#0dffffff"
+                        onClicked: {
+                            if (modelData.label === "美") appState.speak(wordDetail.word, "en", "us")
+                            else appState.speak(wordDetail.word, "en", "uk")
+                        }
                     }
                     Behavior on color { ColorAnimation { duration: 150 } }
                 }
             }
         }
+    }
+
+    // === 考试标签行 ===
+    Flow {
+        Layout.fillWidth: true
+        visible: wordDetail.tags.length > 0
+        spacing: 4
+        Repeater {
+            model: wordDetail.tags
+            delegate: Rectangle {
+                radius: 4
+                color: "#1a3b82f6"
+                implicitWidth: tagText.implicitWidth + 8
+                height: 16
+                Text {
+                    id: tagText
+                    anchors.centerIn: parent
+                    text: modelData
+                    color: "#93c5fd"
+                    font.pixelSize: 9
+                    font.weight: Font.Medium
+                }
+            }
+        }
+    }
+
+    // 英文释义
+    Text {
+        Layout.fillWidth: true
+        text: wordDetail.englishDefinition
+        color: "#80ffffff"
+        font.pixelSize: wordDetail.compact ? 11 : 12
+        font.family: "Georgia"
+        font.italic: true
+        wrapMode: Text.Wrap
+        visible: wordDetail.englishDefinition.length > 0
     }
 
     // 分隔线
@@ -103,7 +131,7 @@ ColumnLayout {
         color: "#0dffffff"
         border.color: DesignTokens.borderSubtle
         border.width: 1
-        implicitHeight: defColumn.implicitHeight + (wordDetail.compact ? 16 : 20)
+        implicitHeight: defColumn.implicitHeight + (wordDetail.compact ? 14 : 18)
 
         ColumnLayout {
             id: defColumn
@@ -111,23 +139,24 @@ ColumnLayout {
             anchors.margins: wordDetail.compact ? 8 : 10
             spacing: 6
 
-            // 第一释义
+            // 第一释义（只显示一个）
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 6
+                spacing: 8
 
                 Rectangle {
                     radius: 6
-                    color: "#333b82f6"
-                    border.color: "#4c3b82f6"
+                    color: "#263b82f6"
+                    border.color: "#403b82f6"
                     border.width: 1
-                    implicitWidth: posText.implicitWidth + 12
-                    height: 18
+                    implicitWidth: posText.implicitWidth + 14
+                    height: 20
 
                     Text {
                         id: posText
                         anchors.centerIn: parent
-                        text: wordDetail.definitions.length > 0 ? wordDetail.definitions[0].partOfSpeech : "adj."
+                        text: wordDetail.definitions.length > 0 && wordDetail.definitions[0].partOfSpeech.length > 0
+                              ? wordDetail.definitions[0].partOfSpeech : "adj."
                         color: "#93c5fd"
                         font.pixelSize: 10
                         font.weight: Font.SemiBold
@@ -144,28 +173,56 @@ ColumnLayout {
                     wrapMode: Text.Wrap
                 }
             }
+        }
+    }
 
-            // 更多释义
+    // === 词形变化 ===
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 4
+        visible: wordDetail.wordForms.length > 0
+
+        Text {
+            text: "词形变化"
+            color: DesignTokens.textPlaceholder
+            font.pixelSize: 9
+            font.weight: Font.SemiBold
+            font.letterSpacing: 1
+            font.capitalization: Font.AllUppercase
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+
             Repeater {
-                model: wordDetail.definitions.length > 1 ? wordDetail.definitions.slice(1) : []
-                delegate: RowLayout {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 2
-                    spacing: 6
+                model: wordDetail.wordForms
+                delegate: Rectangle {
+                    radius: 6
+                    color: "#08ffffff"
+                    border.color: DesignTokens.borderSubtle
+                    border.width: 1
+                    implicitWidth: formRow.implicitWidth + 12
+                    height: 22
 
-                    Text {
-                        text: modelData.partOfSpeech
-                        color: "#cc60a5fa"
-                        font.pixelSize: 10
-                        font.family: "Consolas"
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: modelData.meaning
-                        color: "#b2ffffff"
-                        font.pixelSize: 11
-                        font.family: "Segoe UI"
-                        wrapMode: Text.Wrap
+                    Row {
+                        id: formRow
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Text {
+                            text: modelData.name + ":"
+                            color: "#80ffffff"
+                            font.pixelSize: 9
+                            font.weight: Font.Medium
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: modelData.value
+                            color: "#e6ffffff"
+                            font.pixelSize: 10
+                            font.weight: Font.Medium
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
                     }
                 }
             }
@@ -195,7 +252,7 @@ ColumnLayout {
                 color: "#08ffffff"
                 border.color: DesignTokens.borderSubtle
                 border.width: 1
-                implicitHeight: exampleColumn.implicitHeight + 16
+                implicitHeight: exampleColumn.implicitHeight + 14
 
                 ColumnLayout {
                     id: exampleColumn
@@ -224,14 +281,14 @@ ColumnLayout {
         }
     }
 
-    // === 同反义词 ===
+    // === 同义词 ===
     ColumnLayout {
         Layout.fillWidth: true
         spacing: 4
         visible: wordDetail.synonyms.length > 0
 
         Text {
-            text: "同反义词"
+            text: "同义词"
             color: DesignTokens.textPlaceholder
             font.pixelSize: 9
             font.weight: Font.SemiBold
@@ -266,6 +323,57 @@ ColumnLayout {
                         hoverEnabled: true
                         onEntered: parent.color = "#26ffffff"
                         onExited: parent.color = "#0dffffff"
+                        onClicked: appState.setSourceText(modelData)
+                    }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                }
+            }
+        }
+    }
+
+    // === 反义词 ===
+    ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 4
+        visible: wordDetail.antonyms.length > 0
+
+        Text {
+            text: "反义词"
+            color: DesignTokens.textPlaceholder
+            font.pixelSize: 9
+            font.weight: Font.SemiBold
+            font.letterSpacing: 1
+            font.capitalization: Font.AllUppercase
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 4
+
+            Repeater {
+                model: wordDetail.antonyms
+                delegate: Rectangle {
+                    radius: 6
+                    color: "#0dffffff"
+                    border.color: DesignTokens.borderSubtle
+                    border.width: 1
+                    implicitWidth: antText.implicitWidth + 12
+                    height: 20
+
+                    Text {
+                        id: antText
+                        anchors.centerIn: parent
+                        text: modelData
+                        color: "#f87171"
+                        font.pixelSize: 10
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: parent.color = "#26ffffff"
+                        onExited: parent.color = "#0dffffff"
+                        onClicked: appState.setSourceText(modelData)
                     }
                     Behavior on color { ColorAnimation { duration: 150 } }
                 }

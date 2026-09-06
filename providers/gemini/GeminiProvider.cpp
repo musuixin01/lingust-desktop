@@ -51,6 +51,7 @@ void GeminiProvider::translate(const QString &text, const QString &sourceLang, c
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setTransferTimeout(15000); // 15秒超时
 
     QByteArray body = QJsonDocument(root).toJson();
     QNetworkReply *reply = m_network->post(request, body);

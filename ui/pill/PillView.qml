@@ -12,8 +12,8 @@ Item {
 
     signal expandRequested()
 
-    property bool leftVisible: width >= 320 || leftHovered
-    property bool rightVisible: width >= 440 || rightHovered
+    property bool leftVisible: width >= 280 || leftHovered
+    property bool rightVisible: width >= 360 || rightHovered
 
     // === 毛玻璃背景 ===
     GlassSurface {
@@ -29,49 +29,35 @@ Item {
         anchors.rightMargin: 8
         spacing: 6
 
-        // --- 左侧：红绿灯 ---
+        // --- 左侧：红绿灯（胶囊框，和卡片一致）---
         Item {
             id: leftArea
-            Layout.preferredWidth: leftVisible ? 36 : 0
+            Layout.preferredWidth: leftVisible ? 56 : 0
             Layout.fillHeight: true
             clip: true
 
             Behavior on Layout.preferredWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
+            TrafficLights {
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left
+                anchors.leftMargin: 4
+                opacity: leftVisible ? 1.0 : 0.0
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+                onCloseClicked: appState.clearText()
+                onCollapseClicked: pill.expandRequested()
+                onMinimizeClicked: pill.expandRequested()
+            }
+
             MouseArea {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
-                width: 16
+                width: 20
                 hoverEnabled: true
                 onEntered: leftHovered = true
                 onExited: leftHovered = false
                 z: 10
-            }
-
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                spacing: 6
-                opacity: leftVisible ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-
-                Rectangle {
-                    width: 10; height: 10; radius: 5
-                    color: DesignTokens.lightRed; opacity: 0.7
-                    MouseArea { anchors.fill: parent; hoverEnabled: true
-                        onClicked: appState.clearText()
-                        onEntered: parent.opacity = 1.0; onExited: parent.opacity = 0.7 }
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                }
-                Rectangle {
-                    width: 10; height: 10; radius: 5
-                    color: DesignTokens.lightEmerald; opacity: 0.7
-                    MouseArea { anchors.fill: parent; hoverEnabled: true
-                        onClicked: pill.expandRequested()
-                        onEntered: parent.opacity = 1.0; onExited: parent.opacity = 0.7 }
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                }
             }
         }
 
@@ -186,7 +172,7 @@ Item {
         // --- 右侧：操作按钮 ---
         Item {
             id: rightArea
-            Layout.preferredWidth: rightVisible && !appState.isLoading ? 120 : 0
+            Layout.preferredWidth: rightVisible && !appState.isLoading ? 110 : 0
             Layout.fillHeight: true
             clip: true
 
@@ -247,11 +233,13 @@ Item {
                     iconSource: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
                     iconSize: 14
                     visible: appState.translatedText.length > 0
+                    onClicked: appState.speak()
                 }
                 IconButton {
                     iconSource: "qrc:/qt/qml/Linguist/resources/icons/copy.svg"
                     iconSize: 14
                     visible: appState.translatedText.length > 0
+                    onClicked: appState.copyTranslation()
                 }
                 IconButton {
                     iconSource: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"

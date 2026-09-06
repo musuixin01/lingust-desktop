@@ -258,6 +258,20 @@ void TranslatorWindow::collapseToPill()
     setPosition(pos);
 }
 
+void TranslatorWindow::minimizeToTaskbar()
+{
+    // 最小化到任务栏：先移除 AlwaysOnTop，避免 frameless 窗口最小化崩溃
+    setFlag(Qt::WindowStaysOnTopHint, false);
+    showMinimized();
+    // 恢复时重新设置 AlwaysOnTop
+    connect(this, &QQuickWindow::windowStateChanged, this, [this](Qt::WindowStates state) {
+        if (state != Qt::WindowMinimized) {
+            setFlag(Qt::WindowStaysOnTopHint, true);
+            disconnect(this, &QQuickWindow::windowStateChanged, this, nullptr);
+        }
+    });
+}
+
 void TranslatorWindow::setContentItem(QQuickItem *item)
 {
     if (!item) return;
@@ -272,4 +286,21 @@ void TranslatorWindow::setContentItem(QQuickItem *item)
     connect(this, &QQuickWindow::heightChanged, item, [item, this]() {
         item->setHeight(height());
     });
+}
+
+void TranslatorWindow::adjustHeightToContent(int contentHeight)
+{
+    if (m_currentMode != "card") return;
+    if (contentHeight <= 0) return;
+
+    // 限制最小和最大高度
+    int minH = 200;
+    int maxH = 800;
+    int targetH = qBound(minH, contentHeight, maxH);
+
+    // 如果当前高度已经接近目标高度，不调整
+    if (qAbs(height() - targetH) < 10) return;
+
+    // 动画调整高度
+    animateSize(width(), targetH, 250);
 }

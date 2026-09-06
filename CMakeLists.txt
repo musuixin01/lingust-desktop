@@ -33,6 +33,8 @@ set(SOURCES
     core/window/TranslatorWindow.h
     core/translation/TranslationManager.cpp
     core/translation/TranslationManager.h
+    core/translation/OfflineDictionary.cpp
+    core/translation/OfflineDictionary.h
     providers/ITranslationProvider.h
     providers/gemini/GeminiProvider.cpp
     providers/gemini/GeminiProvider.h
@@ -42,6 +44,10 @@ set(SOURCES
     providers/youdao/YoudaoProvider.h
     infrastructure/database/DatabaseManager.cpp
     infrastructure/database/DatabaseManager.h
+    infrastructure/crash/CrashHandler.cpp
+    infrastructure/crash/CrashHandler.h
+    infrastructure/crash/SafeExecutor.cpp
+    infrastructure/crash/SafeExecutor.h
     core/selection/SelectionManager.cpp
     core/selection/SelectionManager.h
     core/window/TrayManager.cpp
@@ -53,6 +59,8 @@ set(SOURCES
     providers/ocr/IOcrProvider.h
     platform/windows/hotkey/HotkeyManager.cpp
     platform/windows/hotkey/HotkeyManager.h
+    platform/windows/mousehook/MouseHookManager.cpp
+    platform/windows/mousehook/MouseHookManager.h
 )
 
 qt_add_executable(lingust ${SOURCES})

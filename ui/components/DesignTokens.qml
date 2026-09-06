@@ -4,24 +4,25 @@ import QtQuick
 QtObject {
     id: tokens
 
-    // === Surfaces (灰白深灰，无蓝调，85%透明) ===
-    readonly property color bgCard: "#f2686870"
+    // === Surfaces (厚实清透·液态玻璃) ===
+    readonly property color bgCard: "#bf5c5c64"
+    readonly property color bgCardDeep: "#d93a3a40"
     readonly property color bgSubtle: "#00000000"
-    readonly property color bgPill: "#ff0a0a0a"
-    readonly property color bgDark: "#ff0c0c0e"
+    readonly property color bgPill: "#e60e0e12"
+    readonly property color bgDark: "#e0101014"
     readonly property color bgInput: "#00000000"
     readonly property color bgInputFocus: "#1affffff"
 
-    // === Borders ===
-    readonly property color borderNormal: "#26ffffff"
-    readonly property color borderActive: "#59ffffff"
+    // === Borders (细腻高级) ===
+    readonly property color borderNormal: "#2bffffff"
+    readonly property color borderActive: "#4dffffff"
     readonly property color borderSubtle: "#1affffff"
-    readonly property color borderInput: "#33ffffff"
+    readonly property color borderInput: "#2effffff"
     readonly property color borderInputFocus: "#4d60a5fa"
 
     // === Text ===
     readonly property color textPrimary: "white"
-    readonly property color textSecondary: "#d9ffffff"
+    readonly property color textSecondary: "#e0ffffff"
     readonly property color textTertiary: "#99ffffff"
     readonly property color textPlaceholder: "#59ffffff"
 
@@ -68,8 +69,8 @@ QtObject {
     readonly property string easingOut: "OutCubic"
     readonly property string easingSpring: "OutBack"
 
-    // === Shadows ===
-    readonly property color shadowColor: "#94000000"
-    readonly property real shadowBlur: 65
-    readonly property real shadowY: 28
+    // === Shadows (厚实深度) ===
+    readonly property color shadowColor: "#a0000000"
+    readonly property real shadowBlur: 70
+    readonly property real shadowY: 30
 }

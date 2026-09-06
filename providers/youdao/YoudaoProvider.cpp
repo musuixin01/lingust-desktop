@@ -53,6 +53,7 @@ void YoudaoProvider::translate(const QString &text, const QString &sourceLang, c
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+    request.setTransferTimeout(15000); // 15秒超时
 
     QNetworkReply *reply = m_network->post(request, params.toString(QUrl::FullyEncoded).toUtf8());
     connect(reply, &QNetworkReply::finished, this, &YoudaoProvider::onReplyFinished);

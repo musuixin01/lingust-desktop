@@ -5,6 +5,7 @@
 #include <QVariantList>
 #include <QTimer>
 #include "../translation/TranslationManager.h"
+#include "../translation/OfflineDictionary.h"
 #include "../../infrastructure/database/DatabaseManager.h"
 #include "../selection/SelectionManager.h"
 
@@ -22,6 +23,7 @@ class AppState : public QObject
     Q_PROPERTY(bool isFavorite READ isFavorite WRITE setIsFavorite NOTIFY isFavoriteChanged)
     Q_PROPERTY(QString engine READ engine WRITE setEngine NOTIFY engineChanged)
     Q_PROPERTY(bool justCopied READ justCopied NOTIFY justCopiedChanged)
+    Q_PROPERTY(bool isPinned READ isPinned WRITE setIsPinned NOTIFY isPinnedChanged)
     Q_PROPERTY(bool compactMode READ compactMode WRITE setCompactMode NOTIFY compactModeChanged)
     Q_PROPERTY(bool selectionTranslation READ selectionTranslation WRITE setSelectionTranslation NOTIFY selectionTranslationChanged)
     Q_PROPERTY(bool autoSpeak READ autoSpeak WRITE setAutoSpeak NOTIFY autoSpeakChanged)
@@ -29,41 +31,61 @@ class AppState : public QObject
     Q_PROPERTY(QVariantList definitions READ definitions NOTIFY definitionsChanged)
     Q_PROPERTY(QVariantList examples READ examples NOTIFY examplesChanged)
     Q_PROPERTY(QVariantList synonyms READ synonyms NOTIFY synonymsChanged)
+    Q_PROPERTY(QVariantList antonyms READ antonyms NOTIFY antonymsChanged)
+    Q_PROPERTY(QVariantList wordForms READ wordForms NOTIFY wordFormsChanged)
+    Q_PROPERTY(QVariantList tags READ tags NOTIFY tagsChanged)
+    Q_PROPERTY(QString englishDefinition READ englishDefinition NOTIFY englishDefinitionChanged)
     Q_PROPERTY(QVariantList history READ history NOTIFY historyChanged)
     Q_PROPERTY(QVariantList favorites READ favorites NOTIFY favoritesChanged)
+    Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
+    Q_PROPERTY(bool hasError READ hasError NOTIFY errorMessageChanged)
+    Q_PROPERTY(bool didCrashLastRun READ didCrashLastRun NOTIFY crashInfoChanged)
+    Q_PROPERTY(QString lastCrashInfo READ lastCrashInfo NOTIFY crashInfoChanged)
 
 public:
     explicit AppState(QObject *parent = nullptr);
 
     QString sourceText() const;
-    void setSourceText(const QString &text);
+    Q_INVOKABLE void setSourceText(const QString &text);
     QString translatedText() const;
     QString sourceLang() const;
-    void setSourceLang(const QString &lang);
+    Q_INVOKABLE void setSourceLang(const QString &lang);
     QString targetLang() const;
-    void setTargetLang(const QString &lang);
+    Q_INVOKABLE void setTargetLang(const QString &lang);
     bool isTranslating() const;
     bool isWord() const;
     QString phoneticUs() const;
     QString phoneticUk() const;
     bool isFavorite() const;
-    void setIsFavorite(bool fav);
+    Q_INVOKABLE void setIsFavorite(bool fav);
     QString engine() const;
-    void setEngine(const QString &e);
+    Q_INVOKABLE void setEngine(const QString &e);
     bool justCopied() const;
+    bool isPinned() const;
+    Q_INVOKABLE void setIsPinned(bool p);
     bool compactMode() const;
-    void setCompactMode(bool b);
+    Q_INVOKABLE void setCompactMode(bool b);
     bool selectionTranslation() const;
-    void setSelectionTranslation(bool b);
+    Q_INVOKABLE void setSelectionTranslation(bool b);
     bool autoSpeak() const;
-    void setAutoSpeak(bool b);
+    Q_INVOKABLE void setAutoSpeak(bool b);
     double cardOpacity() const;
-    void setCardOpacity(double v);
+    Q_INVOKABLE void setCardOpacity(double v);
     QVariantList definitions() const;
     QVariantList examples() const;
     QVariantList synonyms() const;
+    QVariantList antonyms() const;
+    QVariantList wordForms() const;
+    QVariantList tags() const;
+    QString englishDefinition() const;
     QVariantList history() const;
     QVariantList favorites() const;
+    QString errorMessage() const { return m_errorMessage; }
+    bool hasError() const { return !m_errorMessage.isEmpty(); }
+    Q_INVOKABLE void clearError();
+    bool didCrashLastRun() const;
+    QString lastCrashInfo() const;
+    Q_INVOKABLE void dismissCrashWarning();
 
     Q_INVOKABLE void translate();
     Q_INVOKABLE void swapLanguages();
@@ -77,6 +99,7 @@ public:
     Q_INVOKABLE void refreshHistory();
     Q_INVOKABLE void refreshFavorites();
     Q_INVOKABLE void triggerSelectionTranslation();
+    Q_INVOKABLE QString completeTranslation() const;
 
 signals:
     void sourceTextChanged();
@@ -90,6 +113,7 @@ signals:
     void isFavoriteChanged();
     void engineChanged();
     void justCopiedChanged();
+    void isPinnedChanged();
     void compactModeChanged();
     void selectionTranslationChanged();
     void autoSpeakChanged();
@@ -97,13 +121,20 @@ signals:
     void definitionsChanged();
     void examplesChanged();
     void synonymsChanged();
+    void antonymsChanged();
+    void wordFormsChanged();
+    void tagsChanged();
+    void englishDefinitionChanged();
     void historyChanged();
     void favoritesChanged();
+    void errorMessageChanged();
+    void crashInfoChanged();
 
 private slots:
     void onTranslationReady(const QVariantMap &result);
     void onTranslationError(const QString &error);
     void resetJustCopied();
+    void applyPendingResult();
 
 private:
     void clearResult();
@@ -119,6 +150,7 @@ private:
     bool m_isFavorite;
     QString m_engine;
     bool m_justCopied;
+    bool m_isPinned;
     bool m_compactMode;
     bool m_selectionTranslation;
     bool m_autoSpeak;
@@ -126,10 +158,20 @@ private:
     QVariantList m_definitions;
     QVariantList m_examples;
     QVariantList m_synonyms;
+    QVariantList m_antonyms;
+    QVariantList m_wordForms;
+    QVariantList m_tags;
+    QString m_englishDefinition;
     QVariantList m_history;
     QVariantList m_favorites;
+    QString m_errorMessage;
     QTimer m_copyTimer;
+    QTimer m_minLoadTimer;
+    qint64 m_translateStartTime;
+    QVariantMap m_pendingResult;
+    QString m_pendingError;
     TranslationManager *m_translationManager;
+    OfflineDictionary *m_offlineDict;
     DatabaseManager *m_database;
     SelectionManager *m_selectionManager;
 };

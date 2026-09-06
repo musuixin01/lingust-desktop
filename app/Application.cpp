@@ -12,6 +12,7 @@
 #include "core/window/TranslatorWindow.h"
 #include "core/window/TrayManager.h"
 #include "platform/windows/hotkey/HotkeyManager.h"
+#include "platform/windows/mousehook/MouseHookManager.h"
 
 Application::Application(QObject *parent)
     : QObject(parent)
@@ -26,6 +27,7 @@ int Application::run()
     m_window = std::make_unique<TranslatorWindow>();
     m_tray = std::make_unique<TrayManager>();
     m_hotkey = std::make_unique<HotkeyManager>();
+    m_mouseHook = std::make_unique<MouseHookManager>();
 
     m_engine = std::make_unique<QQmlApplicationEngine>();
     m_engine->rootContext()->setContextProperty("appState", m_appState.get());
@@ -59,6 +61,21 @@ int Application::run()
             m_window->show();
             m_appState->triggerSelectionTranslation();
         }
+    });
+
+    // 全局鼠标 Hook：选中文字后自动翻译
+    m_mouseHook->setDelay(300);
+    QObject::connect(m_mouseHook.get(), &MouseHookManager::selectionFinished, m_appState.get(), [this]() {
+        if (m_appState->selectionTranslation()) {
+            m_window->show();
+            m_appState->triggerSelectionTranslation();
+        }
+    });
+    m_mouseHook->setEnabled(m_appState->selectionTranslation());
+
+    // 监听设置变化，动态启用/禁用鼠标 Hook
+    QObject::connect(m_appState.get(), &AppState::selectionTranslationChanged, m_mouseHook.get(), [this]() {
+        m_mouseHook->setEnabled(m_appState->selectionTranslation());
     });
 
     // 加载主 QML 到 TranslatorWindow

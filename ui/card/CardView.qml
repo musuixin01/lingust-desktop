@@ -6,6 +6,7 @@ Item {
     id: card
 
     property bool isDragging: false
+    property string resizeEdge: "none"
     property bool isMinimal: height <= 130 || (width <= 220 && height <= 160)
     property bool isUltraCompact: !isMinimal && (width < 280 || height < 260)
     property bool isVeryCompact: !isMinimal && (width < 340 || height < 330)
@@ -13,9 +14,31 @@ Item {
     property bool dynamicCompact: !isMinimal && (appState.compactMode || isCompact)
     property bool dynamicTight: !isMinimal && isVeryCompact
 
+    // === 顶部栏动态空间分配 ===
+    property real leftMargin: isUltraCompact ? 8 : (isVeryCompact ? 10 : 14)
+    property real rightMargin: isUltraCompact ? 8 : (isVeryCompact ? 10 : 14)
+    property real rightFullWidth: 104
+    property real rightMinWidth: 52
+    property real middleNaturalWidth: 178
+    property real middleCompactWidth: 152
+    property real middleMinimalWidth: 76
+    property real middleMinWidth: 54
+    property real availableWidth: width - leftMargin - rightMargin - 38
+    property real middleAvailable: availableWidth - rightFullWidth
+    property real topSpacing: middleAvailable > middleNaturalWidth ? Math.min(6, (middleAvailable - middleNaturalWidth) / 2) : 0
+    property real middleWidth: Math.min(middleNaturalWidth, Math.max(middleMinWidth, middleAvailable))
+    property bool middleIsCompact: middleWidth <= middleCompactWidth
+    property bool middleIsMinimal: middleWidth <= middleMinimalWidth
+    property bool middleIsMin: middleWidth <= middleMinWidth
+    property real rightWidth: middleIsMin ? Math.max(rightMinWidth, availableWidth - middleMinWidth) : rightFullWidth
+    property real settingsBtnW: Math.max(0, Math.min(26, rightWidth - 78))
+    property real fontBtnW: Math.max(0, Math.min(26, rightWidth - 52))
+
     signal collapseRequested()
     signal translateRequested()
     signal settingsRequested()
+    signal quitRequested()
+    signal minimizeToTaskbarRequested()
 
     // === 毛玻璃背景 ===
     GlassSurface {
@@ -32,81 +55,170 @@ Item {
         Rectangle {
             id: topBar
             Layout.fillWidth: true
-            Layout.preferredHeight: isUltraCompact ? 28 : (isVeryCompact ? 32 : 38)
+            Layout.preferredHeight: isUltraCompact ? 40 : (isVeryCompact ? 44 : 50)
             color: "transparent"
             visible: !card.isMinimal
 
-            RowLayout {
+            // Row结构自动排列不重叠，弹簧动画线性(100ms)无弹簧感
+            Row {
+                id: topRow
                 anchors.fill: parent
-                anchors.leftMargin: isUltraCompact ? 8 : (isVeryCompact ? 10 : 14)
-                anchors.rightMargin: isUltraCompact ? 8 : (isVeryCompact ? 10 : 14)
-                anchors.topMargin: 4
-                anchors.bottomMargin: 4
-                spacing: 8
+                anchors.leftMargin: card.leftMargin
+                anchors.rightMargin: card.rightMargin
+                spacing: 0
 
+                // 1. 红绿灯
                 TrafficLights {
-                    Layout.alignment: Qt.AlignVCenter
-                    compact: card.isUltraCompact
-                    onCloseClicked: appState.clearText()
-                    onMinimizeClicked: card.collapseRequested()
-                    onRefreshClicked: card.translateRequested()
+                    id: trafficLights
+                    anchors.verticalCenter: parent.verticalCenter
+                    onCloseClicked: card.quitRequested()
+                    onMinimizeClicked: card.minimizeToTaskbarRequested()
+                    onCollapseClicked: card.collapseRequested()
                 }
 
-                Item { Layout.fillWidth: true }
+                // 2. 左弹簧（线性动画，无弹簧感）
+                Item {
+                    id: leftSpring
+                    height: 1
+                    width: Math.max(0, (topRow.width - trafficLights.width - middleGroup.width - iconGroup.width) / 2)
+                    Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                }
 
-                RowLayout {
-                    Layout.alignment: Qt.AlignVCenter
-                    spacing: 6
+                // 3. 中间组
+                Row {
+                    id: middleGroup
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: card.topSpacing
+                    Behavior on spacing { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
 
                     LanguageSelector {
+                        id: langSelector
+                        anchors.verticalCenter: parent.verticalCenter
                         sourceLang: appState.sourceLang
                         targetLang: appState.targetLang
-                        compact: card.width < 360
-                        minimal: card.width < 270
+                        compact: card.middleIsCompact && !card.middleIsMinimal
+                        minimal: card.middleIsMinimal && !card.middleIsMin
+                        textOnly: card.middleIsMin && !langSelector.hovered
+                        iconOnly: false
                         onSwapClicked: appState.swapLanguages()
                     }
 
+                    // 引擎状态
                     Rectangle {
-                        Layout.alignment: Qt.AlignVCenter
-                        Layout.preferredHeight: 22
-                        Layout.preferredWidth: card.width >= 390 ? 80 : 22
-                        radius: 11
+                        id: engineIndicator
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: 18
+                        radius: 9
                         color: "#1affffff"
-                        border.color: DesignTokens.borderInput
-                        border.width: 1
+                        border.color: engineIndicator.expanded ? DesignTokens.borderInput : "transparent"
+                        border.width: engineIndicator.expanded ? 1 : 0
+                        property bool expanded: (!card.middleIsMinimal || engineMouse.containsMouse)
+                        width: expanded ? (engineRow.width + 16) : 18
+                        Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                        Behavior on border.color { ColorAnimation { duration: 100; easing.type: Easing.Linear } }
 
                         Row {
+                            id: engineRow
                             anchors.centerIn: parent
-                            spacing: 4
-                            Rectangle { width: 6; height: 6; radius: 3; color: appState.engine === "offline" ? DesignTokens.accentAmber : DesignTokens.accentEmerald }
+                            spacing: 6
+                            opacity: engineIndicator.expanded ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+
+                            Item {
+                                width: 6; height: 6
+                                anchors.verticalCenter: parent.verticalCenter
+                                Rectangle { anchors.fill: parent; radius: 3; color: appState.engine === "offline" ? DesignTokens.accentAmber : DesignTokens.accentEmerald }
+                                Rectangle { anchors.centerIn: parent; width: 12; height: 12; radius: 6; color: appState.engine === "offline" ? DesignTokens.accentAmber : DesignTokens.accentEmerald; opacity: 0.3 }
+                            }
                             Text {
                                 text: appState.engine === "gemini" ? "Gemini" : appState.engine === "deepl" ? "DeepL" : appState.engine === "youdao" ? "有道" : "离线"
-                                color: "#93c5fd"; font.pixelSize: 10; font.weight: Font.Medium
-                                visible: card.width >= 390
+                                color: "#93c5fd"; font.pixelSize: 9; font.weight: Font.Medium
+                                anchors.verticalCenter: parent.verticalCenter
                             }
                         }
-                        MouseArea { anchors.fill: parent; hoverEnabled: true
+
+                        Item {
+                            anchors.centerIn: parent
+                            width: 6; height: 6
+                            visible: !engineIndicator.expanded
+                            Rectangle { anchors.fill: parent; radius: 3; color: appState.engine === "offline" ? DesignTokens.accentAmber : DesignTokens.accentEmerald }
+                            Rectangle { anchors.centerIn: parent; width: 12; height: 12; radius: 6; color: appState.engine === "offline" ? DesignTokens.accentAmber : DesignTokens.accentEmerald; opacity: 0.3 }
+                        }
+
+                        MouseArea {
+                            id: engineMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
                             onEntered: parent.color = "#26ffffff"
-                            onExited: parent.color = "#1affffff" }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                            onExited: parent.color = "#1affffff"
+                        }
+                        Behavior on color { ColorAnimation { duration: 100; easing.type: Easing.Linear } }
                     }
                 }
 
-                Item { Layout.fillWidth: true }
+                // 4. 右弹簧（线性动画，无弹簧感）
+                Item {
+                    id: rightSpring
+                    height: 1
+                    width: leftSpring.width
+                    Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                }
 
+                // 5. 右边图标组（Row自动排列不重叠，clip确保不超出边框）
                 Row {
-                    Layout.alignment: Qt.AlignVCenter
-                    spacing: 2
+                    id: iconGroup
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 0
+                    clip: true
 
-                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"; iconColor: "#cc60a5fa"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14) }
-                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/pin.svg"; active: appState.isPinned; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14); onClicked: appState.setIsPinned(!appState.isPinned) }
-                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/type.svg"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14) }
-                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/settings.svg"; iconSize: card.isUltraCompact ? 10 : (card.isVeryCompact ? 12 : 14); onClicked: card.settingsRequested() }
+                    // 截图（始终显示）
+                    Item { width: 26; height: 26; IconButton { anchors.centerIn: parent; iconSource: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"; iconColor: "#cc60a5fa"; iconSize: 13 } }
+
+                    // 固定（始终显示）
+                    Item { width: 26; height: 26; IconButton { anchors.centerIn: parent; iconSource: "qrc:/qt/qml/Linguist/resources/icons/pin.svg"; active: appState.isPinned; iconSize: 13; onClicked: appState.setIsPinned(!appState.isPinned) } }
+
+                    // 字体（先被吸进去）
+                    Item {
+                        id: fontBtnContainer
+                        width: card.fontBtnW
+                        height: 26
+                        clip: true
+                        Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                        IconButton {
+                            anchors.centerIn: parent
+                            iconSource: "qrc:/qt/qml/Linguist/resources/icons/type.svg"
+                            iconSize: 13
+                            scale: fontBtnContainer.width > 10 ? 1.0 : 0.0
+                            opacity: fontBtnContainer.width > 10 ? 1 : 0
+                            Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                            Behavior on opacity { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                        }
+                    }
+
+                    // 设置（后被吸进去）
+                    Item {
+                        id: settingsBtnContainer
+                        width: card.settingsBtnW
+                        height: 26
+                        clip: true
+                        Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                        IconButton {
+                            anchors.centerIn: parent
+                            iconSource: "qrc:/qt/qml/Linguist/resources/icons/settings.svg"
+                            iconSize: 13
+                            scale: settingsBtnContainer.width > 10 ? 1.0 : 0.0
+                            opacity: settingsBtnContainer.width > 10 ? 1 : 0
+                            Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                            Behavior on opacity { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                            onClicked: card.settingsRequested()
+                        }
+                    }
                 }
             }
 
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right
+                anchors.leftMargin: card.leftMargin; anchors.rightMargin: card.rightMargin
                 anchors.bottom: parent.bottom
                 height: 1; color: DesignTokens.borderSubtle
             }
@@ -278,7 +390,7 @@ Item {
                                         onEntered: parent.color = "#26ffffff"
                                         onExited: parent.color = "#0dffffff"
                                     }
-                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: 150; easing.type: Easing.Linear } }
                                 }
                             }
                         }
@@ -289,48 +401,82 @@ Item {
             }
         }
 
-        // ========== 操作工具栏（固定在底部栏上方）==========
+        // ========== 操作工具栏 ==========
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 32
             color: "transparent"
             visible: !card.isMinimal && !appState.isLoading && appState.translatedText.length > 0
 
-            RowLayout {
+            // Row结构，左边Smart-Select开关，右边操作图标
+            Row {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 4
+                anchors.leftMargin: card.leftMargin
+                anchors.rightMargin: card.rightMargin
+                spacing: 0
 
-                Text {
-                    Layout.alignment: Qt.AlignVCenter
-                    text: appState.sourceLang + "➔" + appState.targetLang
-                    color: "#cc60a5fa"
-                    font.pixelSize: 10
-                    font.family: "Consolas"
+                // 左边：Smart-Select 切换按钮
+                Row {
+                    id: smartSelectGroup
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
+
+                    Rectangle {
+                        width: 28; height: 14; radius: 7
+                        color: appState.selectionTranslation ? "#cc3b82f6" : "#26ffffff"
+
+                        Rectangle {
+                            width: 10; height: 10; radius: 5
+                            color: "white"
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: appState.selectionTranslation ? (parent.width - width - 2) : 2
+                            Behavior on x { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                        }
+
+                        MouseArea { anchors.fill: parent; onClicked: appState.setSelectionTranslation(!appState.selectionTranslation) }
+                    }
+
+                    Text {
+                        text: appState.selectionTranslation ? "Smart-Select" : "Paused"
+                        color: "#b2ffffff"
+                        font.pixelSize: 10; font.weight: Font.SemiBold; font.letterSpacing: 1
+                        font.capitalization: Font.AllUppercase
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
 
-                Item { Layout.fillWidth: true }
+                // 弹簧
+                Item {
+                    width: parent.width - smartSelectGroup.width - actionButtons.width
+                    Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                }
 
-                IconButton {
-                    iconSource: "qrc:/qt/qml/Linguist/resources/icons/copy.svg"
-                    iconSize: 14
-                    iconColor: appState.justCopied ? "#4ade80" : "#ccffffff"
-                    onClicked: appState.copyTranslation()
+                // 右边：操作图标
+                Row {
+                    id: actionButtons
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 4
+
+                    IconButton {
+                        iconSource: "qrc:/qt/qml/Linguist/resources/icons/copy.svg"
+                        iconSize: 14
+                        iconColor: appState.justCopied ? "#4ade80" : "#ccffffff"
+                        onClicked: appState.copyTranslation()
+                    }
+                    IconButton {
+                        iconSource: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
+                        iconSize: 14
+                        onClicked: appState.speak(appState.sourceText, appState.sourceLang)
+                    }
+                    IconButton {
+                        iconSource: "qrc:/qt/qml/Linguist/resources/icons/heart.svg"
+                        iconSize: 14
+                        active: appState.isFavorite
+                        activeColor: DesignTokens.accentAmber
+                        onClicked: appState.setIsFavorite(!appState.isFavorite)
+                    }
+                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/history.svg"; iconSize: 14 }
                 }
-                IconButton {
-                    iconSource: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
-                    iconSize: 14
-                    onClicked: appState.speak(appState.sourceText, appState.sourceLang)
-                }
-                IconButton {
-                    iconSource: "qrc:/qt/qml/Linguist/resources/icons/heart.svg"
-                    iconSize: 14
-                    active: appState.isFavorite
-                    activeColor: DesignTokens.accentAmber
-                    onClicked: appState.setIsFavorite(!appState.isFavorite)
-                }
-                IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/history.svg"; iconSize: 14 }
             }
 
             Rectangle {
@@ -348,44 +494,33 @@ Item {
             color: "#0dffffff"
             visible: !card.isMinimal && height >= 220 && card.width >= 240
 
-            RowLayout {
+            // Row结构，左边EN➔ZH，右边窗口尺寸，弹簧隔开
+            Row {
                 anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                spacing: 8
+                anchors.leftMargin: card.leftMargin
+                anchors.rightMargin: card.rightMargin
+                spacing: 0
 
-                Row {
-                    Layout.alignment: Qt.AlignVCenter
-                    spacing: 8
-
-                    Rectangle {
-                        width: 28; height: 14; radius: 7
-                        color: appState.selectionTranslation ? "#cc3b82f6" : "#26ffffff"
-
-                        Rectangle {
-                            width: 10; height: 10; radius: 5
-                            color: "white"
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: appState.selectionTranslation ? (parent.width - width - 2) : 2
-                            Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        }
-
-                        MouseArea { anchors.fill: parent; onClicked: appState.setSelectionTranslation(!appState.selectionTranslation) }
-                    }
-
-                    Text {
-                        text: appState.selectionTranslation ? "Smart-Select" : "Paused"
-                        color: "#b2ffffff"
-                        font.pixelSize: 10; font.weight: Font.SemiBold; font.letterSpacing: 1
-                        font.capitalization: Font.AllUppercase
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
+                // 左边：EN➔ZH
+                Text {
+                    id: bottomLangText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: appState.sourceLang + "➔" + appState.targetLang
+                    color: "#cc60a5fa"
+                    font.pixelSize: 10
+                    font.family: "Consolas"
                 }
 
-                Item { Layout.fillWidth: true }
+                // 弹簧（隔开左右）
+                Item {
+                    width: parent.width - bottomLangText.width - sizeText.width
+                    Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                }
 
+                // 右边：窗口尺寸
                 Text {
-                    Layout.alignment: Qt.AlignVCenter
+                    id: sizeText
+                    anchors.verticalCenter: parent.verticalCenter
                     text: Math.round(card.width) + "×" + Math.round(card.height)
                     color: "#4cffffff"
                     font.pixelSize: 9; font.weight: Font.Black; font.letterSpacing: 2
