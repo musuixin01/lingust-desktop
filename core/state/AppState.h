@@ -28,6 +28,7 @@ class AppState : public QObject
     Q_PROPERTY(bool selectionTranslation READ selectionTranslation WRITE setSelectionTranslation NOTIFY selectionTranslationChanged)
     Q_PROPERTY(bool autoSpeak READ autoSpeak WRITE setAutoSpeak NOTIFY autoSpeakChanged)
     Q_PROPERTY(double cardOpacity READ cardOpacity WRITE setCardOpacity NOTIFY cardOpacityChanged)
+    Q_PROPERTY(int fontSizePercent READ fontSizePercent WRITE setFontSizePercent NOTIFY fontSizePercentChanged)
     Q_PROPERTY(QVariantList definitions READ definitions NOTIFY definitionsChanged)
     Q_PROPERTY(QVariantList examples READ examples NOTIFY examplesChanged)
     Q_PROPERTY(QVariantList synonyms READ synonyms NOTIFY synonymsChanged)
@@ -71,6 +72,10 @@ public:
     Q_INVOKABLE void setAutoSpeak(bool b);
     double cardOpacity() const;
     Q_INVOKABLE void setCardOpacity(double v);
+    int fontSizePercent() const;
+    Q_INVOKABLE void setFontSizePercent(int p);
+    Q_INVOKABLE void resetFontSize();
+    Q_INVOKABLE void clearText();
     QVariantList definitions() const;
     QVariantList examples() const;
     QVariantList synonyms() const;
@@ -96,6 +101,7 @@ public:
     Q_INVOKABLE void setApiSecret(const QString &engine, const QString &secret);
     Q_INVOKABLE void toggleFavorite();
     Q_INVOKABLE void clearHistory();
+    Q_INVOKABLE void deleteHistory(int id);
     Q_INVOKABLE void refreshHistory();
     Q_INVOKABLE void refreshFavorites();
     Q_INVOKABLE void triggerSelectionTranslation();
@@ -118,6 +124,7 @@ signals:
     void selectionTranslationChanged();
     void autoSpeakChanged();
     void cardOpacityChanged();
+    void fontSizePercentChanged();
     void definitionsChanged();
     void examplesChanged();
     void synonymsChanged();
@@ -155,6 +162,7 @@ private:
     bool m_selectionTranslation;
     bool m_autoSpeak;
     double m_cardOpacity;
+    int m_fontSizePercent;
     QVariantList m_definitions;
     QVariantList m_examples;
     QVariantList m_synonyms;

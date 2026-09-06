@@ -53,6 +53,11 @@ Thumbs.db
 user_screenshot*.png
 target_effect.png
 current_state.png
+.d0a*
+node_modules/
+dist/
+node-compile-cache/
 
 # Debug screenshots
 *.png
+patches/

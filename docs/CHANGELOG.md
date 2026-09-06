@@ -7,6 +7,35 @@
 ## [Unreleased] - 开发中
 
 ### [Added]
+- **Web 端对齐 - 字体缩放面板 (Font Scaling Popover)**：在 CardView 顶部栏集成与 Web 端相同的动态字号排版弹出层，支持 70%~150% 步进调节（±5%）与 80%/100%/120% 快捷预设标签，支持全局动态字号缩放。
+- **Web 端对齐 - 生词本与历史抽屉 (HistoryView.qml)**：桌面端新增仿 Web 端 `HistoryDrawer` 的半透明玻璃抽屉层，支持按关键词实时过滤、全部与生词本标签快速切换、历史单项快速删除、清空全部历史，以及点击历史记录一键装载并发起即时翻译。
+- **AppState 动态字号与历史管理 API**：
+  - `fontSizePercent` (int, 70~150)：通知全局 QML 计算字号阶梯；
+  - `setFontSizePercent(int)`：设置并持久化字号偏好；
+  - `deleteHistory(int id)`：根据记录唯一 ID 删除对应项；
+  - `clearText()`：便捷清空当前源词与翻译缓冲。
+
+### [Changed]
+- **DesignTokens 视觉 Token 全面对齐 Web 端**：
+  - 玻璃材质色谱：更新为 `#0c0d18` / `#16192a` / `#1e2238` 配合漫反射高光与 macOS 物理倒角刻痕；
+  - 动态字号比例因子：引入 `fontScale: (appState ? appState.fontSizePercent : 100) / 100.0`；
+  - 边框与输入态 Token：重构为 `borderSubtle` (`#14ffffff`)、`borderNormal` (`#26ffffff`)、`borderInput` (`#26ffffff`)、`borderInputFocus` (`#60a5fa`)。
+- **WordDetailView 词汇卡片深度对齐 Web 端**：
+  - 顶部标题行：新增高对比度单词粗体标题（`font.bold: true`）与淡蓝音标，整合美/英（US/UK）发音胶囊按钮；
+  - 多词性释义支持：对齐 Web 端 `definitions.slice(1)` 展开次要词性与释义；
+  - 交互增强：同义词与反义词点击直接触发当前词汇查询与翻译；
+  - 动态字号适配：所有字号使用 `DesignTokens.fontScale` 动态联动。
+- **SearchInput 交互优化**：
+  - 支持双向文本绑定与输入清空（Clear）；
+  - 截图按钮与清空按钮指针手势规范化（`cursorShape: Qt.PointingHandCursor`）；
+  - 截图按钮直连 `appState.triggerSelectionTranslation()`。
+- **CardView 主卡片整合**：
+  - 顶部截图按钮与字体调节按钮完整连通；
+  - 底部栏历史记录图标与生词收藏高亮状态精准同步；
+  - 动态挂载 `HistoryView` 抽屉与 `fontPopover` 浮层。
+
+### [Refactored]
+- 规范化 QML 资源表 `CMakeLists.txt`：加入 `ui/card/HistoryView.qml`，确保构建与资源打包顺利通过。
 - 退出动画：缩放 0.95 + 淡出 0.0（250-300ms InQuad），动画完成后退出
 - 最小化到任务栏：`minimizeToTaskbar()`，先移除 AlwaysOnTop 再 showMinimized，恢复时重新设置置顶
 - 右上角图标逐个吸入动画：窗口缩小时图标从右到左依次收缩宽度+淡出，250ms InOutCubic

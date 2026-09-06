@@ -80,6 +80,7 @@ qt_add_qml_module(lingust
         ui/card/CardView.qml
         ui/card/WordDetailView.qml
         ui/card/SearchInput.qml
+        ui/card/HistoryView.qml
         ui/settings/SettingsView.qml
     RESOURCES
         ui/components/DesignTokens.qml

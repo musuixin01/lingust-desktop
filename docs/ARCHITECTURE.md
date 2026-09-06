@@ -8,8 +8,8 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   UI 层 (Qt Quick / QML)                 │
-│  PillView / CardView / OverlayWindow / SettingsWindow    │
-│  DesignTokens / GlassSurface / HoverScrollText / ...     │
+│  PillView / CardView / WordDetailView / HistoryView     │
+│  SettingsView / OverlayWindow / GlassSurface / Tokens   │
 └──────────────────────────┬──────────────────────────────┘
                            │ property binding / signals
 ┌──────────────────────────▼──────────────────────────────┐

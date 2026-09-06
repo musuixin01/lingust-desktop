@@ -11,20 +11,21 @@ Item {
     property real targetX: 190
     property real targetY: 245
 
-    // === 第一层：深色底层（厚实感）===
+    // === 第一层：深色底层（沉稳通透，深空暗夜基底）===
     Rectangle {
         id: bgBase
         anchors.fill: parent
-        radius: surface.isPill ? 9999 : 32
-        color: surface.isPill ? "#f00a0a0e" : "#c8404048"
+        radius: surface.isPill ? DesignTokens.radiusPill : DesignTokens.radiusCard
+        color: surface.isPill ? DesignTokens.bgPill : DesignTokens.bgCardBase
+        opacity: (typeof appState !== "undefined" && appState && appState.cardOpacity) ? appState.cardOpacity : 0.96
     }
 
-    // === 第二层：均匀磨砂层（清透感，无颗粒）===
+    // === 第二层：均匀磨砂层（10% 清透白，与 Web 端完全一致）===
     Rectangle {
         id: bgFrost
         anchors.fill: parent
         radius: bgBase.radius
-        color: "#12ffffff"
+        color: DesignTokens.bgCard
     }
 
     // === 第三层：动态柔光（大面积柔和弥散，无明显边界）===
@@ -64,8 +65,9 @@ Item {
         anchors.fill: parent
         radius: bgBase.radius
         color: "transparent"
-        border.color: "#3dffffff"
+        border.color: surface.isDragging ? DesignTokens.borderActive : DesignTokens.borderNormal
         border.width: 1
+        Behavior on border.color { ColorAnimation { duration: DesignTokens.durationNormal } }
         z: 2
     }
 

@@ -1,4 +1,4 @@
-﻿#include "AppState.h"
+#include "AppState.h"
 #include "../../infrastructure/crash/CrashHandler.h"
 
 #include <QGuiApplication>
@@ -28,6 +28,7 @@ AppState::AppState(QObject *parent)
     , m_selectionTranslation(true)
     , m_autoSpeak(false)
     , m_cardOpacity(0.95)
+    , m_fontSizePercent(100)
     , m_translationManager(new TranslationManager(this))
     , m_offlineDict(new OfflineDictionary(this))
     , m_database(new DatabaseManager(this))
@@ -178,6 +179,25 @@ void AppState::setCardOpacity(double v)
     if (qFuzzyCompare(m_cardOpacity, clamped)) return;
     m_cardOpacity = clamped;
     emit cardOpacityChanged();
+}
+
+int AppState::fontSizePercent() const { return m_fontSizePercent; }
+void AppState::setFontSizePercent(int p)
+{
+    int clamped = qBound(50, p, 160);
+    if (m_fontSizePercent == clamped) return;
+    m_fontSizePercent = clamped;
+    emit fontSizePercentChanged();
+}
+
+void AppState::resetFontSize()
+{
+    setFontSizePercent(100);
+}
+
+void AppState::clearText()
+{
+    setSourceText("");
 }
 
 QVariantList AppState::definitions() const { return m_definitions; }
@@ -544,6 +564,13 @@ void AppState::clearHistory()
 {
     m_database->clearHistory();
     m_history.clear();
+    emit historyChanged();
+}
+
+void AppState::deleteHistory(int id)
+{
+    m_database->deleteHistory(id);
+    m_history = m_database->getHistory();
     emit historyChanged();
 }
 

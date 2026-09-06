@@ -4,27 +4,28 @@ import QtQuick
 QtObject {
     id: tokens
 
-    // === Surfaces (厚实清透·液态玻璃) ===
-    readonly property color bgCard: "#bf5c5c64"
-    readonly property color bgCardDeep: "#d93a3a40"
-    readonly property color bgSubtle: "#00000000"
-    readonly property color bgPill: "#e60e0e12"
-    readonly property color bgDark: "#e0101014"
-    readonly property color bgInput: "#00000000"
-    readonly property color bgInputFocus: "#1affffff"
+    // === Surfaces (清透拟物·毛玻璃白 / 冰雾冷调暗夜) ===
+    readonly property color bgCard: "#1affffff"       // 10% 白，与 Web 端 bg-white/10 一致
+    readonly property color bgCardBase: "#d8101420"   // 底层深空微蓝冷调高透黑，沉稳通透，消除发灰泥泞感
+    readonly property color bgCardDeep: "#e60d111a"
+    readonly property color bgSubtle: "#0dffffff"     // 5% 白微透容器
+    readonly property color bgPill: "#f0090d16"       // 药丸深邃通透
+    readonly property color bgDark: "#f0090d16"
+    readonly property color bgInput: "#0dffffff"      // Web 输入框容器微透白 5%
+    readonly property color bgInputFocus: "#1fffffff" // 聚焦微透白 12%
 
-    // === Borders (细腻高级) ===
-    readonly property color borderNormal: "#2bffffff"
-    readonly property color borderActive: "#4dffffff"
-    readonly property color borderSubtle: "#1affffff"
-    readonly property color borderInput: "#2effffff"
-    readonly property color borderInputFocus: "#4d60a5fa"
+    // === Borders (细腻高级·与 Web 对齐) ===
+    readonly property color borderNormal: "#33ffffff" // border-white/20
+    readonly property color borderActive: "#59ffffff" // border-white/35
+    readonly property color borderSubtle: "#1affffff" // border-white/10
+    readonly property color borderInput: "#26ffffff"  // border-white/15
+    readonly property color borderInputFocus: "#6660a5fa"
 
     // === Text ===
-    readonly property color textPrimary: "white"
-    readonly property color textSecondary: "#e0ffffff"
-    readonly property color textTertiary: "#99ffffff"
-    readonly property color textPlaceholder: "#59ffffff"
+    readonly property color textPrimary: "#ffffff"
+    readonly property color textSecondary: "#f1f5f9"
+    readonly property color textTertiary: "#94a3b8"
+    readonly property color textPlaceholder: "#64748b"
 
     // === Accent Colors ===
     readonly property color accentBlue: "#60a5fa"
@@ -54,7 +55,7 @@ QtObject {
     readonly property int space2xl: 24
 
     // === Font Sizes ===
-    readonly property real fontScale: appState ? appState.fontSizePercent / 100.0 : 0.92
+    readonly property real fontScale: (typeof appState !== "undefined" && appState && appState.fontSizePercent) ? appState.fontSizePercent / 100.0 : 1.0
     readonly property int fontSizeMicro: 9
     readonly property int fontSizeXs: 11
     readonly property int fontSizeSm: 13

@@ -13,6 +13,8 @@ Item {
     property bool isCompact: !isMinimal && (width < 420 || height < 400)
     property bool dynamicCompact: !isMinimal && (appState.compactMode || isCompact)
     property bool dynamicTight: !isMinimal && isVeryCompact
+    property bool showFontPopover: false
+    property bool showHistoryDrawer: false
 
     // === 顶部栏动态空间分配 ===
     property real leftMargin: isUltraCompact ? 8 : (isVeryCompact ? 10 : 14)
@@ -172,7 +174,20 @@ Item {
                     clip: true
 
                     // 截图（始终显示）
-                    Item { width: 26; height: 26; IconButton { anchors.centerIn: parent; iconSource: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"; iconColor: "#cc60a5fa"; iconSize: 13 } }
+                    Item {
+                        width: 26; height: 26
+                        IconButton {
+                            anchors.centerIn: parent
+                            iconSource: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"
+                            iconColor: "#cc60a5fa"
+                            iconSize: 13
+                            onClicked: {
+                                if (typeof appState !== "undefined" && appState) {
+                                    appState.triggerSelectionTranslation();
+                                }
+                            }
+                        }
+                    }
 
                     // 固定（始终显示）
                     Item { width: 26; height: 26; IconButton { anchors.centerIn: parent; iconSource: "qrc:/qt/qml/Linguist/resources/icons/pin.svg"; active: appState.isPinned; iconSize: 13; onClicked: appState.setIsPinned(!appState.isPinned) } }
@@ -188,10 +203,13 @@ Item {
                             anchors.centerIn: parent
                             iconSource: "qrc:/qt/qml/Linguist/resources/icons/type.svg"
                             iconSize: 13
+                            active: card.showFontPopover
+                            activeColor: "#60a5fa"
                             scale: fontBtnContainer.width > 10 ? 1.0 : 0.0
                             opacity: fontBtnContainer.width > 10 ? 1 : 0
                             Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
                             Behavior on opacity { NumberAnimation { duration: 100; easing.type: Easing.Linear } }
+                            onClicked: card.showFontPopover = !card.showFontPopover
                         }
                     }
 
@@ -267,7 +285,7 @@ Item {
                         text: appState.completeTranslation()
                         textColor: "#f2ffffff"
                         fontSize: 12
-                        prefix: appState.isWord && appState.phonetic ? appState.phonetic : ""
+                        prefix: appState.isWord ? (appState.phoneticUs.length > 0 ? appState.phoneticUs : appState.phoneticUk) : ""
                         visible: !appState.isLoading && appState.translatedText.length > 0
                     }
                 }
@@ -323,11 +341,15 @@ Item {
                     WordDetailView {
                         Layout.fillWidth: true
                         word: appState.sourceText
-                        phonetic: appState.phonetic
+                        phonetic: appState.phoneticUs.length > 0 ? appState.phoneticUs : appState.phoneticUk
                         translatedText: appState.translatedText
+                        englishDefinition: appState.englishDefinition
                         definitions: appState.definitions
                         examples: appState.examples
                         synonyms: appState.synonyms
+                        antonyms: appState.antonyms
+                        wordForms: appState.wordForms
+                        tags: appState.tags
                         compact: dynamicCompact
                         veryCompact: dynamicTight
                         ultraCompact: isUltraCompact
@@ -475,7 +497,13 @@ Item {
                         activeColor: DesignTokens.accentAmber
                         onClicked: appState.setIsFavorite(!appState.isFavorite)
                     }
-                    IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/history.svg"; iconSize: 14 }
+                    IconButton {
+                        iconSource: "qrc:/qt/qml/Linguist/resources/icons/history.svg"
+                        iconSize: 14
+                        active: card.showHistoryDrawer
+                        activeColor: "#60a5fa"
+                        onClicked: card.showHistoryDrawer = !card.showHistoryDrawer
+                    }
                 }
             }
 
@@ -533,6 +561,210 @@ Item {
                 anchors.top: parent.top
                 height: 1; color: DesignTokens.borderSubtle
             }
+        }
+    }
+
+    // === 字体大小与排版悬浮面板 (对齐 Web 端) ===
+    Rectangle {
+        id: fontPopover
+        z: 25
+        anchors.top: parent.top
+        anchors.topMargin: (isUltraCompact ? 40 : (isVeryCompact ? 44 : 50)) + 4
+        anchors.right: parent.right
+        anchors.rightMargin: card.rightMargin
+        width: Math.min(240, card.width - 20)
+        height: fontPopCol.implicitHeight + 20
+        radius: 14
+        color: DesignTokens.bgCardDeep
+        border.color: DesignTokens.borderNormal
+        border.width: 1
+        clip: true
+
+        visible: opacity > 0
+        opacity: card.showFontPopover ? 1.0 : 0.0
+        scale: card.showFontPopover ? 1.0 : 0.92
+        transformOrigin: Item.TopRight
+
+        Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+        ColumnLayout {
+            id: fontPopCol
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 8
+
+            // 标题行
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Image {
+                    source: "qrc:/qt/qml/Linguist/resources/icons/type.svg"
+                    sourceSize.width: 12; sourceSize.height: 12
+                }
+
+                Text {
+                    text: "字体大小调节"
+                    color: DesignTokens.textPrimary
+                    font.pixelSize: 11
+                    font.bold: true
+                    Layout.fillWidth: true
+                }
+
+                Rectangle {
+                    width: 18; height: 18; radius: 9
+                    color: "transparent"
+
+                    Image {
+                        anchors.centerIn: parent
+                        source: "qrc:/qt/qml/Linguist/resources/icons/close.svg"
+                        sourceSize.width: 8; sourceSize.height: 8
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: card.showFontPopover = false
+                    }
+                }
+            }
+
+            Rectangle { Layout.fillWidth: true; height: 1; color: DesignTokens.borderSubtle }
+
+            // 步进调节 [-] 100% [+]
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Rectangle {
+                    width: 26; height: 26; radius: 6
+                    color: "#14ffffff"
+                    border.color: DesignTokens.borderSubtle
+                    border.width: 1
+
+                    Image {
+                        anchors.centerIn: parent
+                        source: "qrc:/qt/qml/Linguist/resources/icons/minus.svg"
+                        sourceSize.width: 10; sourceSize.height: 10
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (typeof appState !== "undefined" && appState) {
+                                appState.setFontSizePercent(appState.fontSizePercent - 5);
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 26
+                    radius: 6
+                    color: "#0dffffff"
+                    border.color: DesignTokens.borderSubtle
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: (typeof appState !== "undefined" && appState ? appState.fontSizePercent : 100) + "%"
+                        color: "#93c5fd"
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.family: "Consolas"
+                    }
+                }
+
+                Rectangle {
+                    width: 26; height: 26; radius: 6
+                    color: "#14ffffff"
+                    border.color: DesignTokens.borderSubtle
+                    border.width: 1
+
+                    Image {
+                        anchors.centerIn: parent
+                        source: "qrc:/qt/qml/Linguist/resources/icons/plus.svg"
+                        sourceSize.width: 10; sourceSize.height: 10
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (typeof appState !== "undefined" && appState) {
+                                appState.setFontSizePercent(appState.fontSizePercent + 5);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 预设快捷选项
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                Repeater {
+                    model: [
+                        { label: "80%", val: 80 },
+                        { label: "100%", val: 100 },
+                        { label: "120%", val: 120 }
+                    ]
+
+                    delegate: Rectangle {
+                        Layout.fillWidth: true
+                        height: 22
+                        radius: 6
+                        color: (typeof appState !== "undefined" && appState && appState.fontSizePercent === modelData.val) ? "#333b82f6" : "#0dffffff"
+                        border.color: (typeof appState !== "undefined" && appState && appState.fontSizePercent === modelData.val) ? "#60a5fa" : DesignTokens.borderSubtle
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.label
+                            color: (typeof appState !== "undefined" && appState && appState.fontSizePercent === modelData.val) ? "#ffffff" : DesignTokens.textSecondary
+                            font.pixelSize: 10
+                            font.bold: typeof appState !== "undefined" && appState && appState.fontSizePercent === modelData.val
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (typeof appState !== "undefined" && appState) {
+                                    appState.setFontSizePercent(modelData.val);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // === 历史记录抽屉遮罩 (对齐 Web 端 HistoryDrawer) ===
+    Item {
+        id: historyOverlay
+        anchors.fill: parent
+        anchors.margins: 4
+        z: 30
+        visible: opacity > 0
+        opacity: card.showHistoryDrawer ? 1.0 : 0.0
+        scale: card.showHistoryDrawer ? 1.0 : 0.96
+
+        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+        HistoryView {
+            anchors.fill: parent
+            onCloseRequested: card.showHistoryDrawer = false
         }
     }
 }

@@ -48,7 +48,12 @@ Rectangle {
             background: Rectangle { color: "transparent" }
             verticalAlignment: TextInput.AlignVCenter
 
-            onTextChanged: searchBox.userTextChanged(text)
+            onTextChanged: {
+                if (searchBox.text !== text) {
+                    searchBox.text = text;
+                    searchBox.userTextChanged(text);
+                }
+            }
             onAccepted: searchBox.submitted()
             onFocusChanged: searchBox.focused = focus
         }
@@ -69,7 +74,14 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: { searchBox.userTextChanged(""); }
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    searchBox.text = "";
+                    searchBox.userTextChanged("");
+                    if (typeof appState !== "undefined" && appState) {
+                        appState.setSourceText("");
+                    }
+                }
                 onEntered: parent.color = "#1affffff"
                 onExited: parent.color = "transparent"
             }
@@ -91,6 +103,12 @@ Rectangle {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    if (typeof appState !== "undefined" && appState) {
+                        appState.triggerSelectionTranslation();
+                    }
+                }
                 onEntered: parent.color = "#1affffff"
                 onExited: parent.color = "transparent"
             }
