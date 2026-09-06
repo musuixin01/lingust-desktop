@@ -26,6 +26,7 @@ class AppState : public QObject
     Q_PROPERTY(bool isPinned READ isPinned WRITE setIsPinned NOTIFY isPinnedChanged)
     Q_PROPERTY(bool compactMode READ compactMode WRITE setCompactMode NOTIFY compactModeChanged)
     Q_PROPERTY(bool selectionTranslation READ selectionTranslation WRITE setSelectionTranslation NOTIFY selectionTranslationChanged)
+    Q_PROPERTY(QString selectionTriggerMode READ selectionTriggerMode WRITE setSelectionTriggerMode NOTIFY selectionTriggerModeChanged)
     Q_PROPERTY(bool autoSpeak READ autoSpeak WRITE setAutoSpeak NOTIFY autoSpeakChanged)
     Q_PROPERTY(double cardOpacity READ cardOpacity WRITE setCardOpacity NOTIFY cardOpacityChanged)
     Q_PROPERTY(int fontSizePercent READ fontSizePercent WRITE setFontSizePercent NOTIFY fontSizePercentChanged)
@@ -68,6 +69,8 @@ public:
     Q_INVOKABLE void setCompactMode(bool b);
     bool selectionTranslation() const;
     Q_INVOKABLE void setSelectionTranslation(bool b);
+    QString selectionTriggerMode() const;
+    Q_INVOKABLE void setSelectionTriggerMode(const QString &mode);
     bool autoSpeak() const;
     Q_INVOKABLE void setAutoSpeak(bool b);
     double cardOpacity() const;
@@ -96,7 +99,7 @@ public:
     Q_INVOKABLE void swapLanguages();
     Q_INVOKABLE void copyTranslation();
     Q_INVOKABLE void copySourceText();
-    Q_INVOKABLE void speak(const QString &text, const QString &lang = "en", const QString &accent = "us");
+    Q_INVOKABLE void speak(const QString &text = QString(), const QString &lang = QString(), const QString &accent = "us");
     Q_INVOKABLE void setApiKey(const QString &engine, const QString &key);
     Q_INVOKABLE void setApiSecret(const QString &engine, const QString &secret);
     Q_INVOKABLE void toggleFavorite();
@@ -122,6 +125,7 @@ signals:
     void isPinnedChanged();
     void compactModeChanged();
     void selectionTranslationChanged();
+    void selectionTriggerModeChanged();
     void autoSpeakChanged();
     void cardOpacityChanged();
     void fontSizePercentChanged();
@@ -160,6 +164,7 @@ private:
     bool m_isPinned;
     bool m_compactMode;
     bool m_selectionTranslation;
+    QString m_selectionTriggerMode;
     bool m_autoSpeak;
     double m_cardOpacity;
     int m_fontSizePercent;

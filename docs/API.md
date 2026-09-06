@@ -139,3 +139,20 @@
   "message": "未检测到 Gemini API Key，请先输入密钥"
 }
 ```
+
+---
+
+## 5. C++ / QML 状态与发音控制 (AppState Bridge)
+
+### 划词交互控制
+- **`selectionTranslation`** (`bool`): 控制是否监听 Windows 全局鼠标划词事件（`WH_MOUSE_LL` 钩子开关）。
+- **`selectionTriggerMode`** (`QString`):
+  - `"auto"`（默认）：**关气泡，划词直出**。选中文本直接弹出主翻译卡片，跳过悬浮小气泡。
+  - `"icon"`：**微气泡模式**。选中文本在光标右上方仅浮现微型快捷胶囊，点击后再展开完整卡片。
+
+### 语音合成与发音 (TTS)
+- **`speak(text, lang, accent)`**:
+  - `text` (`QString`, 可选)：朗读文本。若为空自动按优先级选取 `translatedText` 或 `sourceText`；
+  - `lang` (`QString`, 可选)：语言代码（`"en"`、`"zh"` 等）。默认自动适配当前目标语言；
+  - `accent` (`QString`, 默认 `"us"`)：口音控制。支持 `"us"`（美音，Zira/David）与 `"uk"`（英音，Hazel/George）；
+  - **实现架构**：基于 Windows 原生 PowerShell `System.Speech.Synthesis` + `SAPI.SpVoice` 双引擎降级，文本经 Base64 编码穿透，异步无窗口闪烁运行。

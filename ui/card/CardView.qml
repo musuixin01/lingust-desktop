@@ -373,15 +373,97 @@ Item {
                         visible: !appState.isLoading && appState.isWord && appState.translatedText.length > 0
                     }
 
-                    // 句子翻译
+                    // 句子翻译（点击任意句子均可即时朗读）
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 4
                         visible: !appState.isLoading && !appState.isWord && appState.translatedText.length > 0
 
-                        HoverScrollText { Layout.fillWidth: true; text: appState.translatedText; textColor: "#f2ffffff"; fontSize: isUltraCompact ? 12 : (isVeryCompact ? 14 : 16) }
+                        // 译文卡片：点击朗读译文
+                        Rectangle {
+                            id: transSentenceCard
+                            Layout.fillWidth: true
+                            radius: 8
+                            color: transMouse.containsMouse ? "#143b82f6" : "transparent"
+                            border.color: transMouse.containsMouse ? "#4060a5fa" : "transparent"
+                            border.width: 1
+                            implicitHeight: transRow.implicitHeight + 8
+
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            RowLayout {
+                                id: transRow
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                spacing: 6
+
+                                HoverScrollText {
+                                    Layout.fillWidth: true
+                                    text: appState.translatedText
+                                    textColor: "#f2ffffff"
+                                    fontSize: isUltraCompact ? 12 : (isVeryCompact ? 14 : 16)
+                                }
+
+                                Image {
+                                    source: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
+                                    sourceSize.width: 12; sourceSize.height: 12
+                                    opacity: transMouse.containsMouse ? 0.9 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                }
+                            }
+
+                            MouseArea {
+                                id: transMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: appState.speak(appState.translatedText, appState.targetLang)
+                            }
+                        }
+
                         Rectangle { Layout.fillWidth: true; height: 1; color: DesignTokens.borderSubtle }
-                        HoverScrollText { Layout.fillWidth: true; text: appState.sourceText; textColor: "#80ffffff"; fontSize: isUltraCompact ? 10 : (isVeryCompact ? 12 : 13) }
+
+                        // 原文卡片：点击朗读原文
+                        Rectangle {
+                            id: srcSentenceCard
+                            Layout.fillWidth: true
+                            radius: 8
+                            color: srcMouse.containsMouse ? "#14ffffff" : "transparent"
+                            border.color: srcMouse.containsMouse ? "#33ffffff" : "transparent"
+                            border.width: 1
+                            implicitHeight: srcRow.implicitHeight + 8
+
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            RowLayout {
+                                id: srcRow
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                spacing: 6
+
+                                HoverScrollText {
+                                    Layout.fillWidth: true
+                                    text: appState.sourceText
+                                    textColor: "#80ffffff"
+                                    fontSize: isUltraCompact ? 10 : (isVeryCompact ? 12 : 13)
+                                }
+
+                                Image {
+                                    source: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
+                                    sourceSize.width: 12; sourceSize.height: 12
+                                    opacity: srcMouse.containsMouse ? 0.9 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                                }
+                            }
+
+                            MouseArea {
+                                id: srcMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: appState.speak(appState.sourceText, appState.sourceLang)
+                            }
+                        }
                     }
 
                     // 空状态

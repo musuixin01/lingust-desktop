@@ -7,6 +7,30 @@
 ## [Unreleased] - 开发中
 
 ### [Added]
+- **鼠标点击句子即时朗读发音 (Click-to-Speak Sentences)**：
+  - **长句翻译面板**：
+    - 点击译文句子：自动触发对应目标语言（如中文）即时朗读；
+    - 点击原文句子：自动触发对应源语言（如英文）即时朗读；
+    - 交互视觉反馈：鼠标悬停显示轻微微透卡片光晕、手型指针与音量小喇叭渐显，带来直观灵敏的听音体验；
+  - **单词深度视图 (WordDetailView)**：
+    - 双语例句（Bilingual Examples）卡片支持鼠标直接点击整句朗读，右侧常驻/悬停提示音量图标，方便随时跟读例句；
+  - **双端 100% 对齐**：Qt QML 桌面端（`CardView.qml`、`WordDetailView.qml`）与 Web 端（`FloatingTranslatorCard.tsx`、`WordDetailView.tsx`）全线同步支持。
+- **划词模式支持独立关气泡直达卡片 (SelectionTriggerMode)**：
+  - `AppState` 扩展 `selectionTriggerMode` 属性（支持 `"auto"` 与 `"icon"` 两种模式）；
+  - 设置面板与状态彻底打通：用户选择 **“立即弹出卡片”** 时，即可彻底关闭悬浮微型小气泡，鼠标划词直接呼出主翻译卡片，流畅无阻；
+  - 划词翻译功能与小气泡解耦：关闭气泡后划词翻译完全可用，满足用户“只要划词翻译、不要中间小气泡遮挡”的需求。
+- **生词本与历史抽屉新增单项一键发音**：
+  - 在 `HistoryView.qml` 每条历史记录卡片右上角增加发音小喇叭按钮，点击即可直接听取历史单词/短语的原声发音。
+
+### [Fixed]
+- **全面排查并修复 Windows 桌面端发音异常 (AppState::speak)**：
+  - **参数签名自适应**：为 `speak(text, lang, accent)` 提供默认实参，支持 QML 侧直接无参调用 `appState.speak()`（自动提取当前译文或源词朗读，修复 `PillView.qml` 药丸模式下因缺省实参导致的方法匹配失败）；
+  - **VBScript 语法死锁修复**：修复原 VBScript 单行 `If ... Then ... : End If` 导致的语法解析异常；
+  - **升级为 Windows 原生 PowerShell + SAPI 双引擎发音系统**：
+    - 优先采用 Windows .NET 原生 `System.Speech.Synthesis.SpeechSynthesizer`，全面支持英式发音（Hazel / George 等 `en-GB`）与美式发音（Zira / David 等 `en-US`）以及中文（Huihui / Yaoyao 等 `zh-CN`）；
+    - 文本传输全面采用 **Base64** 编解码穿透，彻底根治多行文本换行截断、双引号转义冲突以及中文字符集乱码问题；
+    - 在极端或受限 Windows 权限环境下自动回退到 `SAPI.SpVoice` COM 接口，保证 100% 发音成功率；
+    - 保持全异步无黑框后台运行（`-WindowStyle Hidden -NoProfile`），绝不阻塞 QML 界面渲染与动效。
 - **Web 端 1:1 复刻 - 截图框选逐行中英对照翻译 (ScreenshotTranslationView.qml)**：
   - 深度对齐 Web 端 `ScreenshotTranslationView`，实现全屏/区域截图后的逐行双语对照展示；
   - 顶部状态横幅：显示识别行数与语言方向（如 `共识别 3 行文本 · EN ➔ ZH`），附带 `逐行中英对照` 胶囊徽章；

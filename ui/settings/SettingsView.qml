@@ -21,7 +21,7 @@ Rectangle {
     property string testResultText: ""
     property bool testSuccess: true
     property bool isTesting: false
-    property string triggerMode: "auto" // auto | icon
+    property string triggerMode: (typeof appState !== "undefined" && appState) ? appState.selectionTriggerMode : "auto" // auto (关气泡直出卡片) | icon (小气泡)
     property string currentWallpaper: "frosted-glass"
 
     // 阴影装饰边框
@@ -716,7 +716,10 @@ Rectangle {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: settingsView.triggerMode = "auto"
+                                onClicked: {
+                                    settingsView.triggerMode = "auto";
+                                    if (typeof appState !== "undefined" && appState) appState.setSelectionTriggerMode("auto");
+                                }
                             }
                         }
 
@@ -739,7 +742,10 @@ Rectangle {
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: settingsView.triggerMode = "icon"
+                                onClicked: {
+                                    settingsView.triggerMode = "icon";
+                                    if (typeof appState !== "undefined" && appState) appState.setSelectionTriggerMode("icon");
+                                }
                             }
                         }
                     }

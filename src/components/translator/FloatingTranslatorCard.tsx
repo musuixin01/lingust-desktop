@@ -1625,27 +1625,45 @@ export const FloatingTranslatorCard: React.FC<FloatingTranslatorCardProps> = ({
                 effectiveFontScale={effectiveFontScale}
               />
             ) : (
-              /* Sentence / Paragraph Translation with hover scroll */
+              /* Sentence / Paragraph Translation with hover scroll and click-to-speak */
               <div className="space-y-1 select-text overflow-hidden">
-                <HoverScrollText
-                  text={result.translatedText}
-                  className={`font-semibold text-white/95 leading-tight break-words block ${
-                    isUltraCompact
-                      ? 'text-xs'
-                      : isVeryCompact
-                      ? 'text-sm'
-                      : isCompact
-                      ? 'text-base'
-                      : 'text-base sm:text-lg'
-                  }`}
-                />
+                <div
+                  onClick={() => speakText(result.translatedText, result.targetLang || targetLang)}
+                  className="p-1 rounded-lg hover:bg-blue-500/10 border border-transparent hover:border-blue-400/20 transition-all cursor-pointer group flex items-start justify-between gap-1.5"
+                  title="点击朗读译文"
+                >
+                  <div className="flex-1 min-w-0">
+                    <HoverScrollText
+                      text={result.translatedText}
+                      className={`font-semibold text-white/95 leading-tight break-words block ${
+                        isUltraCompact
+                          ? 'text-xs'
+                          : isVeryCompact
+                          ? 'text-sm'
+                          : isCompact
+                          ? 'text-base'
+                          : 'text-base sm:text-lg'
+                      }`}
+                    />
+                  </div>
+                  <Volume2 className="w-3.5 h-3.5 text-white/20 group-hover:text-blue-400 shrink-0 mt-0.5 transition-colors" />
+                </div>
                 <div className="h-px bg-white/10 w-full" />
-                <HoverScrollText
-                  text={result.sourceText}
-                  className={`text-white/50 leading-snug italic break-words block ${
-                    isUltraCompact ? 'text-[10px]' : isVeryCompact ? 'text-xs' : 'text-sm'
-                  }`}
-                />
+                <div
+                  onClick={() => speakText(result.sourceText, result.sourceLang || sourceLang)}
+                  className="p-1 rounded-lg hover:bg-white/[0.06] border border-transparent hover:border-white/10 transition-all cursor-pointer group flex items-start justify-between gap-1.5"
+                  title="点击朗读原文"
+                >
+                  <div className="flex-1 min-w-0">
+                    <HoverScrollText
+                      text={result.sourceText}
+                      className={`text-white/50 leading-snug italic break-words block ${
+                        isUltraCompact ? 'text-[10px]' : isVeryCompact ? 'text-xs' : 'text-sm'
+                      }`}
+                    />
+                  </div>
+                  <Volume2 className="w-3 h-3 text-white/20 group-hover:text-white/80 shrink-0 mt-0.5 transition-colors" />
+                </div>
               </div>
             )}
 

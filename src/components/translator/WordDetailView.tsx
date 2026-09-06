@@ -159,14 +159,19 @@ export const WordDetailView: React.FC<WordDetailViewProps> = ({
             {examples.slice(0, 2).map((eg, idx) => (
               <div
                 key={idx}
-                className="p-1.5 sm:p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-0.5 hover:bg-white/[0.06] transition-colors"
+                onClick={() => handleSpeak(eg.src, 'us')}
+                className="p-1.5 sm:p-2 rounded-lg bg-white/[0.03] border border-white/5 space-y-0.5 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer group flex items-start justify-between gap-2"
+                title="点击朗读例句"
               >
-                <div className="text-white/90 leading-tight font-serif text-[11px] sm:text-xs break-words">
-                  {eg.src}
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="text-white/90 leading-tight font-serif text-[11px] sm:text-xs break-words">
+                    {eg.src}
+                  </div>
+                  <div className="text-white/50 leading-tight text-[10px] sm:text-[11px] break-words">
+                    {eg.dst}
+                  </div>
                 </div>
-                <div className="text-white/50 leading-tight text-[10px] sm:text-[11px] break-words">
-                  {eg.dst}
-                </div>
+                <Volume2 className="w-3.5 h-3.5 text-white/30 group-hover:text-white/80 shrink-0 mt-0.5 transition-colors" />
               </div>
             ))}
           </div>

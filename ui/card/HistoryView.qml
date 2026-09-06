@@ -272,6 +272,31 @@ Rectangle {
                                 }
                             }
 
+                            // 单词发音
+                            Rectangle {
+                                width: 18; height: 18; radius: 9
+                                color: speakItemMouse.containsMouse ? "#26ffffff" : "transparent"
+
+                                Image {
+                                    anchors.centerIn: parent
+                                    source: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
+                                    sourceSize.width: 10; sourceSize.height: 10
+                                    opacity: speakItemMouse.containsMouse ? 1.0 : 0.6
+                                }
+
+                                MouseArea {
+                                    id: speakItemMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (appState && modelData.sourceText) {
+                                            appState.speak(modelData.sourceText, modelData.sourceLang || "en");
+                                        }
+                                    }
+                                }
+                            }
+
                             // 删除单项
                             Rectangle {
                                 width: 18; height: 18; radius: 9

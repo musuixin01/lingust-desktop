@@ -306,34 +306,62 @@ ColumnLayout {
         Repeater {
             model: wordDetail.examples.slice(0, 2)
             delegate: Rectangle {
+                id: egCard
                 Layout.fillWidth: true
                 radius: 8
-                color: "#08ffffff"
-                border.color: DesignTokens.borderSubtle
+                color: egMouse.containsMouse ? "#14ffffff" : "#08ffffff"
+                border.color: egMouse.containsMouse ? "#33ffffff" : DesignTokens.borderSubtle
                 border.width: 1
-                implicitHeight: exampleColumn.implicitHeight + 14
+                implicitHeight: exampleRow.implicitHeight + 14
 
-                ColumnLayout {
-                    id: exampleColumn
+                Behavior on color { ColorAnimation { duration: 150 } }
+
+                RowLayout {
+                    id: exampleRow
                     anchors.fill: parent
                     anchors.margins: 8
-                    spacing: 2
+                    spacing: 8
 
-                    Text {
+                    ColumnLayout {
+                        id: exampleColumn
                         Layout.fillWidth: true
-                        text: modelData.src
-                        color: "#e6ffffff"
-                        font.pixelSize: 11
-                        font.family: "Georgia"
-                        wrapMode: Text.Wrap
+                        spacing: 2
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData.src
+                            color: "#e6ffffff"
+                            font.pixelSize: 11
+                            font.family: "Georgia"
+                            wrapMode: Text.Wrap
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData.dst
+                            color: "#80ffffff"
+                            font.pixelSize: 10
+                            font.family: "Segoe UI"
+                            wrapMode: Text.Wrap
+                        }
                     }
-                    Text {
-                        Layout.fillWidth: true
-                        text: modelData.dst
-                        color: "#80ffffff"
-                        font.pixelSize: 10
-                        font.family: "Segoe UI"
-                        wrapMode: Text.Wrap
+
+                    Image {
+                        source: "qrc:/qt/qml/Linguist/resources/icons/volume.svg"
+                        sourceSize.width: 12; sourceSize.height: 12
+                        opacity: egMouse.containsMouse ? 0.9 : 0.3
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+                }
+
+                MouseArea {
+                    id: egMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (typeof appState !== "undefined" && appState && modelData.src) {
+                            appState.speak(modelData.src, "en");
+                        }
                     }
                 }
             }

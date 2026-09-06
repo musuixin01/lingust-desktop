@@ -26,6 +26,7 @@ AppState::AppState(QObject *parent)
     , m_isPinned(false)
     , m_compactMode(false)
     , m_selectionTranslation(true)
+    , m_selectionTriggerMode("auto")
     , m_autoSpeak(false)
     , m_cardOpacity(0.95)
     , m_fontSizePercent(100)
@@ -162,6 +163,14 @@ void AppState::setSelectionTranslation(bool b)
     if (m_selectionTranslation == b) return;
     m_selectionTranslation = b;
     emit selectionTranslationChanged();
+}
+
+QString AppState::selectionTriggerMode() const { return m_selectionTriggerMode; }
+void AppState::setSelectionTriggerMode(const QString &mode)
+{
+    if (m_selectionTriggerMode == mode) return;
+    m_selectionTriggerMode = mode;
+    emit selectionTriggerModeChanged();
 }
 
 bool AppState::autoSpeak() const { return m_autoSpeak; }
@@ -489,36 +498,52 @@ void AppState::resetJustCopied()
 
 void AppState::speak(const QString &text, const QString &lang, const QString &accent)
 {
-    if (text.isEmpty()) return;
+    QString targetText = text.trimmed();
+    if (targetText.isEmpty()) {
+        targetText = m_translatedText.trimmed().isEmpty() ? m_sourceText.trimmed() : m_translatedText.trimmed();
+    }
+    if (targetText.isEmpty()) return;
 
-    QString voiceName;
-    if (lang == "zh" || lang == "zh-CN") {
-        voiceName = "Microsoft Huihui Desktop";
-    } else if (lang == "en") {
-        if (accent == "uk") {
-            voiceName = "Microsoft Hazel Desktop";  // 英式英语
-        } else {
-            voiceName = "Microsoft Zira Desktop";   // 美式英语
-        }
-    } else {
-        voiceName = "Microsoft Zira Desktop";
+    QString targetLang = lang.trimmed().toLower();
+    if (targetLang.isEmpty()) {
+        targetLang = m_targetLang.trimmed().toLower();
+        if (targetLang.isEmpty()) targetLang = "en";
     }
 
-    QString escapedText = text;
-    escapedText.replace("\"", "\"\"");
+    QByteArray base64Text = targetText.toUtf8().toBase64();
+    QString culturePrefix = (targetLang.startsWith("zh")) ? "zh" : "en";
+    QString accentPreference = (accent == "uk") ? "en-GB" : "en-US";
 
-    // 使用 SAPI.SpVoice 并设置语音
-    QString script = QString(
-        "Set voice = CreateObject(\"SAPI.SpVoice\")"
-        ": Set voice.Voice = voice.GetVoices.Item(0)"
-        ": For Each v In voice.GetVoices"
-        ": If InStr(v.GetDescription, \"%1\") > 0 Then Set voice.Voice = v : Exit For"
-        ": End If"
-        ": Next"
-        ": voice.Speak \"%2\""
-    ).arg(voiceName, escapedText).replace("\n", " ");
+    // 采用 Windows 原生 PowerShell System.Speech 并在异常时自动回退到 SAPI.SpVoice
+    // 使用 Base64 编解码彻底规避中文字符集乱码、引号转义及换行截断问题
+    QString psCommand = QString(
+        "try { "
+        "Add-Type -AssemblyName System.Speech; "
+        "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+        "$b = [System.Convert]::FromBase64String('%1'); "
+        "$t = [System.Text.Encoding]::UTF8.GetString($b); "
+        "$voices = $s.GetInstalledVoices() | Where-Object { $_.Enabled }; "
+        "if ('%2' -eq 'en-GB') { $v = $voices | Where-Object { $_.VoiceInfo.Culture.Name -like '*GB*' -or $_.VoiceInfo.Name -like '*Hazel*' -or $_.VoiceInfo.Name -like '*George*' } | Select-Object -First 1 } "
+        "elseif ('%3' -eq 'zh') { $v = $voices | Where-Object { $_.VoiceInfo.Culture.Name -like '*CN*' -or $_.VoiceInfo.Culture.Name -like '*zh*' -or $_.VoiceInfo.Name -like '*Huihui*' -or $_.VoiceInfo.Name -like '*Yaoyao*' } | Select-Object -First 1 } "
+        "else { $v = $voices | Where-Object { $_.VoiceInfo.Culture.Name -like '*US*' -or $_.VoiceInfo.Name -like '*Zira*' -or $_.VoiceInfo.Name -like '*David*' } | Select-Object -First 1 }; "
+        "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; "
+        "$s.Rate = 0; "
+        "$s.Speak($t); "
+        "} catch { "
+        "$v = New-Object -ComObject SAPI.SpVoice; "
+        "$b = [System.Convert]::FromBase64String('%1'); "
+        "$t = [System.Text.Encoding]::UTF8.GetString($b); "
+        "$v.Speak($t); "
+        "}"
+    ).arg(QString::fromLatin1(base64Text), accentPreference, culturePrefix);
 
-    QProcess::startDetached("mshta", QStringList() << "vbscript:" + script + "close()");
+    QProcess::startDetached("powershell", QStringList()
+        << "-NoProfile"
+        << "-NonInteractive"
+        << "-ExecutionPolicy" << "Bypass"
+        << "-WindowStyle" << "Hidden"
+        << "-Command" << psCommand
+    );
 }
 
 void AppState::setApiKey(const QString &engine, const QString &key)
