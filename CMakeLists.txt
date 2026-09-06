@@ -81,12 +81,15 @@ qt_add_qml_module(lingust
         ui/card/WordDetailView.qml
         ui/card/SearchInput.qml
         ui/card/HistoryView.qml
+        ui/card/ScreenshotTranslationView.qml
         ui/settings/SettingsView.qml
     RESOURCES
         ui/components/DesignTokens.qml
         resources/icons/crop.svg
+        resources/icons/camera.svg
         resources/icons/pin.svg
         resources/icons/settings.svg
+        resources/icons/sliders.svg
         resources/icons/volume.svg
         resources/icons/copy.svg
         resources/icons/check.svg
@@ -100,6 +103,10 @@ qt_add_qml_module(lingust
         resources/icons/type.svg
         resources/icons/plus.svg
         resources/icons/minus.svg
+        resources/icons/eye.svg
+        resources/icons/eye-off.svg
+        resources/icons/external-link.svg
+        resources/icons/rotate-ccw.svg
 )
 
 target_link_libraries(lingust PRIVATE

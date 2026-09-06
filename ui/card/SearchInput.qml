@@ -12,6 +12,7 @@ Rectangle {
     property bool focused: false
     signal userTextChanged(string newText)
     signal submitted()
+    signal screenshotClicked()
 
     radius: searchBox.compact ? 12 : 16
     color: searchBox.focused ? DesignTokens.bgInputFocus : DesignTokens.bgInput
@@ -105,6 +106,7 @@ Rectangle {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
+                    searchBox.screenshotClicked();
                     if (typeof appState !== "undefined" && appState) {
                         appState.triggerSelectionTranslation();
                     }

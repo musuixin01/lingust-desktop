@@ -15,6 +15,7 @@ Item {
     property bool dynamicTight: !isMinimal && isVeryCompact
     property bool showFontPopover: false
     property bool showHistoryDrawer: false
+    property bool showScreenshotView: false
 
     // === 顶部栏动态空间分配 ===
     property real leftMargin: isUltraCompact ? 8 : (isVeryCompact ? 10 : 14)
@@ -248,12 +249,25 @@ Item {
             Layout.fillHeight: true
             clip: true
 
+            // --- 截图翻译模式 (对齐 Web 端 ScreenshotTranslationView) ---
+            ScreenshotTranslationView {
+                anchors.fill: parent
+                anchors.margins: dynamicTight ? 6 : (dynamicCompact ? 8 : 12)
+                visible: card.showScreenshotView
+                onBackToTextRequested: card.showScreenshotView = false
+                onRetakeRequested: {
+                    if (typeof appState !== "undefined" && appState) {
+                        appState.triggerSelectionTranslation();
+                    }
+                }
+            }
+
             // --- 极简模式 ---
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 8
                 spacing: 4
-                visible: card.isMinimal
+                visible: card.isMinimal && !card.showScreenshotView
 
                 SearchInput {
                     Layout.fillWidth: true
@@ -262,6 +276,7 @@ Item {
                     placeholder: "搜索或输入..."
                     onTextChanged: appState.setSourceText(text)
                     onSubmitted: appState.translate()
+                    onScreenshotClicked: card.showScreenshotView = true
                 }
 
                 Item {
@@ -296,6 +311,7 @@ Item {
                 id: flickable
                 anchors.fill: parent
                 clip: true
+                visible: !card.isMinimal && !card.showScreenshotView
                 contentWidth: width
                 contentHeight: contentColumn.implicitHeight + (dynamicTight ? 16 : (dynamicCompact ? 20 : 28))
                 boundsBehavior: Flickable.StopAtBounds
@@ -313,6 +329,7 @@ Item {
                         text: appState.sourceText
                         onTextChanged: appState.setSourceText(text)
                         onSubmitted: appState.translate()
+                        onScreenshotClicked: card.showScreenshotView = true
                     }
 
                     // 加载中
@@ -428,7 +445,7 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 32
             color: "transparent"
-            visible: !card.isMinimal && !appState.isLoading && appState.translatedText.length > 0
+            visible: !card.isMinimal && !card.showScreenshotView && !appState.isLoading && appState.translatedText.length > 0
 
             // Row结构，左边Smart-Select开关，右边操作图标
             Row {
