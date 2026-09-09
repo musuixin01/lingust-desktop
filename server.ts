@@ -1,12 +1,8 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { SERVER_CONFIG } from './server/config';
 import apiRoutes from './server/routes';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = SERVER_CONFIG.PORT;
@@ -27,6 +23,20 @@ app.get('/api/health', (req, res) => {
 
 // Mount enterprise modular API routes
 app.use(apiRoutes);
+
+// Static public assets (manifest, sw.js, icons, etc.)
+app.use(
+  express.static(path.join(process.cwd(), 'public'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.webmanifest')) {
+        res.setHeader('Content-Type', 'application/manifest+json');
+      } else if (filePath.endsWith('sw.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Service-Worker-Allowed', '/');
+      }
+    },
+  })
+);
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

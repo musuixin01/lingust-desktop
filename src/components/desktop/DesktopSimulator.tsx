@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Zap,
   Crop,
+  Download,
+  Laptop,
 } from 'lucide-react';
 import { AppSettings } from '../../types';
 
@@ -20,6 +22,7 @@ interface DesktopSimulatorProps {
   settings: AppSettings;
   onQuickSelectWord: (text: string) => void;
   onOpenSnipper?: () => void;
+  onOpenInstallModal?: () => void;
   isDark?: boolean;
 }
 
@@ -27,6 +30,7 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
   settings,
   onQuickSelectWord,
   onOpenSnipper,
+  onOpenInstallModal,
   isDark = true,
 }) => {
   const [activeTab, setActiveTab] = useState<'tech' | 'story' | 'vocab' | 'bilingual'>('bilingual');
@@ -55,6 +59,17 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
               <Crop className="w-3 h-3" />
               <span>截图翻译</span>
             </button>
+            {onOpenInstallModal && (
+              <button
+                type="button"
+                onClick={onOpenInstallModal}
+                className="hover:text-emerald-300 text-emerald-400 font-medium flex items-center gap-1 cursor-pointer"
+                title="免重复下载，安装为独立桌面软件"
+              >
+                <Laptop className="w-3 h-3" />
+                <span>安装为桌面端 (PWA)</span>
+              </button>
+            )}
             <span className="hover:text-white cursor-default">Window</span>
             <span className="hover:text-white cursor-default">Help</span>
           </div>
@@ -62,6 +77,17 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
 
         {/* Right status bar */}
         <div className="flex items-center gap-3 text-[11px] text-slate-300">
+          {onOpenInstallModal && (
+            <button
+              type="button"
+              onClick={onOpenInstallModal}
+              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/25 hover:bg-emerald-500/40 text-[10px] text-emerald-200 border border-emerald-400/40 transition-all cursor-pointer shadow-xs active:scale-95"
+              title="一键安装为独立桌面软件，免下载秒安装"
+            >
+              <Download className="w-3 h-3 text-emerald-400" />
+              <span>安装桌面版</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onOpenSnipper}
@@ -98,6 +124,16 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenInstallModal && (
+              <button
+                type="button"
+                onClick={onOpenInstallModal}
+                className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors flex items-center gap-1 cursor-pointer shadow-md"
+              >
+                <Laptop className="w-3 h-3" />
+                <span className="hidden xs:inline">安装桌面端</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onOpenSnipper}
@@ -128,49 +164,35 @@ export const DesktopSimulator: React.FC<DesktopSimulatorProps> = ({
               </div>
             </div>
 
-            {/* Switch tabs */}
+            {/* Switch tabs with smooth pill animations */}
             <div className="flex items-center gap-1 text-xs overflow-x-auto max-w-full py-0.5 no-scrollbar">
-              <button
-                type="button"
-                onClick={() => setActiveTab('bilingual')}
-                className={`px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                  activeTab === 'bilingual' ? 'bg-white/15 text-white font-medium' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                经典双语
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('tech')}
-                className={`px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                  activeTab === 'tech' ? 'bg-white/15 text-white font-medium' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                前沿科技
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('story')}
-                className={`px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                  activeTab === 'story' ? 'bg-white/15 text-white font-medium' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                双语散文
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('vocab')}
-                className={`px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                  activeTab === 'vocab' ? 'bg-white/15 text-white font-medium' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                高频词汇
-              </button>
+              {[
+                { id: 'bilingual', label: '经典双语' },
+                { id: 'tech', label: '前沿科技' },
+                { id: 'story', label: '双语散文' },
+                { id: 'vocab', label: '高频词汇' },
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`px-2.5 py-1 rounded-lg transition-all duration-200 ease-out whitespace-nowrap interactive-button ${
+                      isActive
+                        ? 'bg-white/20 text-white font-medium shadow-xs ring-1 ring-white/20'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Article Content with rich selectable text */}
-          <div className="p-6 md:p-8 space-y-6 text-sm leading-relaxed">
+          {/* Article Content with smooth micro-transition on tab change */}
+          <div key={activeTab} className="p-6 md:p-8 space-y-6 text-sm leading-relaxed animate-view-scale">
             {activeTab === 'bilingual' && (
               <>
                 <div className="border-b border-white/10 pb-4 flex items-center justify-between">

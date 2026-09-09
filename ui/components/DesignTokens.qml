@@ -4,6 +4,9 @@ import QtQuick
 QtObject {
     id: tokens
 
+    // 工具栏仅颜色回落使用短反馈；几何与按下状态直接更新。
+    readonly property int toolbarFeedbackMs: 60
+
     // === Surfaces (清透拟物·毛玻璃白 / 冰雾冷调暗夜) ===
     readonly property color bgCard: "#1affffff"       // 10% 白，与 Web 端 bg-white/10 一致
     readonly property color bgCardBase: "#d8101420"   // 底层深空微蓝冷调高透黑，沉稳通透，消除发灰泥泞感
@@ -24,8 +27,8 @@ QtObject {
     // === Text ===
     readonly property color textPrimary: "#ffffff"
     readonly property color textSecondary: "#f1f5f9"
-    readonly property color textTertiary: "#94a3b8"
-    readonly property color textPlaceholder: "#64748b"
+    readonly property color textTertiary: "#bac4d2"
+    readonly property color textPlaceholder: "#a6b2c2"
 
     // === Accent Colors ===
     readonly property color accentBlue: "#60a5fa"

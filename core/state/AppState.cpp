@@ -34,6 +34,8 @@ AppState::AppState(QObject *parent)
     , m_offlineDict(new OfflineDictionary(this))
     , m_database(new DatabaseManager(this))
     , m_selectionManager(new SelectionManager(this))
+    , m_mediaSession(new MediaSessionService(this))
+    , m_pillMusicMode(false)
 {
     m_definitions = {
         QVariantMap{{"partOfSpeech", "adj."}, {"meaning", "高效的；效率高的"}}
@@ -44,6 +46,15 @@ AppState::AppState(QObject *parent)
             this, &AppState::onTranslationReady);
     connect(m_translationManager, &TranslationManager::translationError,
             this, &AppState::onTranslationError);
+
+    connect(m_mediaSession, &MediaSessionService::playbackStateChanged,
+            this, &AppState::musicPlayingChanged);
+    connect(m_mediaSession, &MediaSessionService::trackChanged,
+            this, &AppState::musicTrackChanged);
+    connect(m_mediaSession, &MediaSessionService::positionChanged,
+            this, &AppState::musicPositionChanged);
+    connect(m_mediaSession, &MediaSessionService::lyricChanged,
+            this, &AppState::musicLyricChanged);
 
     m_copyTimer.setSingleShot(true);
     m_copyTimer.setInterval(1200);
@@ -659,3 +670,85 @@ QString AppState::completeTranslation() const
     }
     return m_translatedText;
 }
+
+bool AppState::musicPlaying() const
+{
+    return m_mediaSession ? m_mediaSession->isPlaying() : false;
+}
+
+QString AppState::trackTitle() const
+{
+    return m_mediaSession ? m_mediaSession->title() : QString();
+}
+
+QString AppState::trackArtist() const
+{
+    return m_mediaSession ? m_mediaSession->artist() : QString();
+}
+
+QString AppState::trackAlbum() const
+{
+    return m_mediaSession ? m_mediaSession->album() : QString();
+}
+
+int AppState::trackDuration() const
+{
+    return m_mediaSession ? m_mediaSession->durationSeconds() : 0;
+}
+
+int AppState::trackPosition() const
+{
+    return m_mediaSession ? m_mediaSession->positionSeconds() : 0;
+}
+
+QString AppState::currentLyric() const
+{
+    return m_mediaSession ? m_mediaSession->currentLyric() : QString();
+}
+
+QString AppState::currentLyricTranslation() const
+{
+    return m_mediaSession ? m_mediaSession->currentLyricTranslation() : QString();
+}
+
+void AppState::setPillMusicMode(bool enabled)
+{
+    if (m_pillMusicMode != enabled) {
+        m_pillMusicMode = enabled;
+        emit pillMusicModeChanged();
+    }
+}
+
+void AppState::togglePillMusicMode()
+{
+    setPillMusicMode(!m_pillMusicMode);
+}
+
+void AppState::toggleMusicPlay()
+{
+    if (m_mediaSession) {
+        m_mediaSession->togglePlay();
+    }
+}
+
+void AppState::nextTrack()
+{
+    if (m_mediaSession) {
+        m_mediaSession->next();
+    }
+}
+
+void AppState::prevTrack()
+{
+    if (m_mediaSession) {
+        m_mediaSession->previous();
+    }
+}
+
+void AppState::seekTrack(int seconds)
+{
+    if (m_mediaSession) {
+        m_mediaSession->seek(seconds);
+    }
+}
+

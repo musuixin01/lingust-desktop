@@ -82,6 +82,24 @@ export interface EngineApiKeys {
   youdaoAppSecret?: string;
 }
 
+export interface LyricLine {
+  time: number; // in seconds
+  text: string;
+  translation?: string;
+}
+
+export interface TrackInfo {
+  id: string;
+  title: string;
+  artist: string;
+  album?: string;
+  coverUrl?: string;
+  audioUrl?: string;
+  duration: number; // in seconds
+  source?: 'system' | 'local' | 'stream';
+  lyrics?: LyricLine[];
+}
+
 export interface AppSettings {
   translationEngine: TranslationEngine;
   engineKeys: EngineApiKeys;
@@ -94,4 +112,6 @@ export interface AppSettings {
   compactMode: boolean;
   fontSize: FontSizePreference; // 自定义字体大小预设
   customFontSize?: number; // 精确百分比字号 (60% ~ 150%)，支持直接输入调节
+  pillMusicEnabled?: boolean; // 药丸灵动岛音乐模块开关
+  pillIslandMode?: 'auto' | 'translation' | 'music'; // 药丸展示模式
 }

@@ -4,12 +4,13 @@ import { DEFAULT_SOURCE_LANG, DEFAULT_TARGET_LANG } from './constants/languages'
 import {
   FloatingTranslatorCard,
   DesktopSimulator,
-  SettingsModal,
-  HistoryDrawer,
+  SettingsWindow,
+  HistoryWindow,
   SelectionTooltip,
   ScreenSnipper,
   InPlaceScreenshotCard,
 } from './components';
+import { PWAInstallModal } from './components/common/PWAInstallModal';
 import { speakText } from './utils/speech';
 import { translateOffline } from './utils/offlineEngine';
 
@@ -88,6 +89,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSnipperOpen, setIsSnipperOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   // In-place fixed screenshot translation cards positioned at the exact snipped location
   const [inPlaceSnippets, setInPlaceSnippets] = useState<InPlaceScreenshotTranslation[]>([]);
@@ -530,12 +532,13 @@ export default function App() {
   }[settings.desktopWallpaper];
 
   return (
-    <div className={`relative w-screen h-screen overflow-hidden ${wallpaperClass}`}>
+    <div className={`relative w-screen h-screen overflow-hidden transition-all duration-700 ease-in-out ${wallpaperClass}`}>
       {/* Background simulated macOS Desktop Workspace */}
       <DesktopSimulator
         settings={settings}
         onQuickSelectWord={handleSelectWord}
         onOpenSnipper={() => setIsSnipperOpen(true)}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
         isDark={settings.desktopWallpaper !== 'minimal-light'}
       />
 
@@ -600,30 +603,43 @@ export default function App() {
         }}
       />
 
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onUpdateSettings={(newSettings) => setSettings((prev) => ({ ...prev, ...newSettings }))}
-        isDark={settings.themeMode === 'dark'}
-      />
+      {/* Settings Standalone Window */}
+      {isSettingsOpen && (
+        <SettingsWindow
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onUpdateSettings={(newSettings) => setSettings((prev) => ({ ...prev, ...newSettings }))}
+          isDark={settings.themeMode === 'dark'}
+          onOpenInstallModal={() => setIsInstallModalOpen(true)}
+        />
+      )}
 
-      {/* History & Favorites Drawer */}
-      <HistoryDrawer
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onSelectResult={(item) => {
-          setSourceText(item.sourceText);
-          setSourceLang(item.sourceLang);
-          setTargetLang(item.targetLang);
-          setResult(item);
-        }}
-        onToggleFavorite={handleToggleFavorite}
-        onClearHistory={() => setHistory([])}
-        isDark={settings.themeMode === 'dark'}
-      />
+      {/* History & Favorites Standalone Window */}
+      {isHistoryOpen && (
+        <HistoryWindow
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          history={history}
+          onSelectResult={(item) => {
+            setSourceText(item.sourceText);
+            setSourceLang(item.sourceLang);
+            setTargetLang(item.targetLang);
+            setResult(item);
+          }}
+          onToggleFavorite={handleToggleFavorite}
+          onClearHistory={() => setHistory([])}
+          isDark={settings.themeMode === 'dark'}
+        />
+      )}
+
+      {/* Desktop App PWA Install Guide & Trigger Modal */}
+      {isInstallModalOpen && (
+        <PWAInstallModal
+          isOpen={isInstallModalOpen}
+          onClose={() => setIsInstallModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

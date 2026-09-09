@@ -16,7 +16,7 @@ Rectangle {
     property bool minimal: false
     property bool iconOnly: false
     property bool textOnly: false
-    property bool hovered: false
+    readonly property bool hovered: selectorHover.hovered
 
     signal sourceClicked()
     signal targetClicked()
@@ -34,43 +34,57 @@ Rectangle {
             anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             text: selector.sourceLang
-            color: DesignTokens.textSecondary
+            color: srcMouse.containsMouse ? "#ffffff" : DesignTokens.textSecondary
             font.pixelSize: selector.minimal ? 9 : 10
             font.weight: Font.Medium
             font.family: "Segoe UI"
 
+            Behavior on color { ColorAnimation { duration: DesignTokens.toolbarFeedbackMs; easing.type: Easing.OutCubic } }
+
             MouseArea {
+                id: srcMouse
                 anchors.fill: parent
                 anchors.margins: -4
                 hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
                 onClicked: selector.sourceClicked()
             }
         }
 
         // 交换按钮
         Rectangle {
+            id: swapBtn
             anchors.centerIn: parent
             width: 18
             height: 18
             radius: 9
-            color: "transparent"
+            color: swapMouse.containsMouse ? "#26ffffff" : "transparent"
+            scale: swapMouse.pressed ? 0.88 : (swapMouse.containsMouse ? 1.10 : 1.0)
+
+            Behavior on color { ColorAnimation { duration: DesignTokens.toolbarFeedbackMs; easing.type: Easing.OutCubic } }
+            Behavior on scale { enabled: !swapMouse.pressed; NumberAnimation { duration: DesignTokens.toolbarFeedbackMs; easing.type: Easing.OutCubic } }
 
             Image {
+                id: swapIcon
                 anchors.centerIn: parent
                 source: "qrc:/qt/qml/Linguist/resources/icons/swap.svg"
                 sourceSize.width: 11
                 sourceSize.height: 11
+                property real rot: 0
+                rotation: rot
+                Behavior on rot { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
             }
 
             MouseArea {
+                id: swapMouse
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: selector.swapClicked()
-                onEntered: parent.color = "#1affffff"
-                onExited: parent.color = "transparent"
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    swapIcon.rot += 180;
+                    selector.swapClicked();
+                }
             }
-
-            Behavior on color { ColorAnimation { duration: 150 } }
         }
 
         // 目标语言
@@ -80,15 +94,19 @@ Rectangle {
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             text: selector.targetLang
-            color: DesignTokens.textSecondary
+            color: tgtMouse.containsMouse ? "#ffffff" : DesignTokens.textSecondary
             font.pixelSize: selector.minimal ? 9 : 10
             font.weight: Font.Medium
             font.family: "Segoe UI"
 
+            Behavior on color { ColorAnimation { duration: DesignTokens.toolbarFeedbackMs; easing.type: Easing.OutCubic } }
+
             MouseArea {
+                id: tgtMouse
                 anchors.fill: parent
                 anchors.margins: -4
                 hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
                 onClicked: selector.targetClicked()
             }
         }
@@ -141,15 +159,6 @@ Rectangle {
         }
     }
 
-    // hover检测（缩小模式下悬浮展开）
-    MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        onEntered: selector.hovered = true
-        onExited: selector.hovered = false
-        propagateComposedEvents: true
-    }
-
-    // 线性动画，无弹簧感
-    Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.Linear } }
+    // 悬停观察不抢占子按钮点击；宽度直接跟随布局。
+    HoverHandler { id: selectorHover }
 }

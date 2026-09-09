@@ -65,12 +65,12 @@ Item {
             easing.type: Easing.Linear
         }
 
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            onEntered: marqueeAnim.pause()
-            onExited: marqueeAnim.resume()
-            z: 5
+    }
+    HoverHandler {
+        id: marqueeHover
+        onHoveredChanged: {
+            if (hovered) marqueeAnim.pause()
+            else if (marqueeAnim.paused) marqueeAnim.resume()
         }
     }
 }

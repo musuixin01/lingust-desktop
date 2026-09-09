@@ -10,6 +10,9 @@
 
 #include "core/state/AppState.h"
 #include "core/window/TranslatorWindow.h"
+#ifdef Q_OS_WIN
+#include "platform/windows/window/WindowsResizeSession.h"
+#endif
 #include "core/window/TrayManager.h"
 #include "platform/windows/hotkey/HotkeyManager.h"
 #include "platform/windows/mousehook/MouseHookManager.h"
@@ -25,6 +28,9 @@ int Application::run()
 {
     m_appState = std::make_unique<AppState>();
     m_window = std::make_unique<TranslatorWindow>();
+#ifdef Q_OS_WIN
+    m_window->setResizeSession(std::make_unique<WindowsResizeSession>());
+#endif
     m_tray = std::make_unique<TrayManager>();
     m_hotkey = std::make_unique<HotkeyManager>();
     m_mouseHook = std::make_unique<MouseHookManager>();

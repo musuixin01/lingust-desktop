@@ -56,7 +56,10 @@ current_state.png
 .d0a*
 node_modules/
 dist/
+dev-dist/
 node-compile-cache/
+__pycache__/
+*.pyc
 
 # Debug screenshots
 *.png

@@ -8,6 +8,7 @@
 #include "../translation/OfflineDictionary.h"
 #include "../../infrastructure/database/DatabaseManager.h"
 #include "../selection/SelectionManager.h"
+#include "../media/MediaSessionService.h"
 
 class AppState : public QObject
 {
@@ -43,6 +44,16 @@ class AppState : public QObject
     Q_PROPERTY(bool hasError READ hasError NOTIFY errorMessageChanged)
     Q_PROPERTY(bool didCrashLastRun READ didCrashLastRun NOTIFY crashInfoChanged)
     Q_PROPERTY(QString lastCrashInfo READ lastCrashInfo NOTIFY crashInfoChanged)
+    // 灵动岛音乐与系统媒体总线
+    Q_PROPERTY(bool musicPlaying READ musicPlaying NOTIFY musicPlayingChanged)
+    Q_PROPERTY(QString trackTitle READ trackTitle NOTIFY musicTrackChanged)
+    Q_PROPERTY(QString trackArtist READ trackArtist NOTIFY musicTrackChanged)
+    Q_PROPERTY(QString trackAlbum READ trackAlbum NOTIFY musicTrackChanged)
+    Q_PROPERTY(int trackDuration READ trackDuration NOTIFY musicTrackChanged)
+    Q_PROPERTY(int trackPosition READ trackPosition NOTIFY musicPositionChanged)
+    Q_PROPERTY(QString currentLyric READ currentLyric NOTIFY musicLyricChanged)
+    Q_PROPERTY(QString currentLyricTranslation READ currentLyricTranslation NOTIFY musicLyricChanged)
+    Q_PROPERTY(bool pillMusicMode READ pillMusicMode WRITE setPillMusicMode NOTIFY pillMusicModeChanged)
 
 public:
     explicit AppState(QObject *parent = nullptr);
@@ -110,6 +121,23 @@ public:
     Q_INVOKABLE void triggerSelectionTranslation();
     Q_INVOKABLE QString completeTranslation() const;
 
+    // 灵动岛音乐与媒体操作
+    bool musicPlaying() const;
+    QString trackTitle() const;
+    QString trackArtist() const;
+    QString trackAlbum() const;
+    int trackDuration() const;
+    int trackPosition() const;
+    QString currentLyric() const;
+    QString currentLyricTranslation() const;
+    bool pillMusicMode() const { return m_pillMusicMode; }
+    Q_INVOKABLE void setPillMusicMode(bool enabled);
+    Q_INVOKABLE void togglePillMusicMode();
+    Q_INVOKABLE void toggleMusicPlay();
+    Q_INVOKABLE void nextTrack();
+    Q_INVOKABLE void prevTrack();
+    Q_INVOKABLE void seekTrack(int seconds);
+
 signals:
     void sourceTextChanged();
     void translatedTextChanged();
@@ -140,6 +168,11 @@ signals:
     void favoritesChanged();
     void errorMessageChanged();
     void crashInfoChanged();
+    void musicPlayingChanged();
+    void musicTrackChanged();
+    void musicPositionChanged();
+    void musicLyricChanged();
+    void pillMusicModeChanged();
 
 private slots:
     void onTranslationReady(const QVariantMap &result);
@@ -187,4 +220,6 @@ private:
     OfflineDictionary *m_offlineDict;
     DatabaseManager *m_database;
     SelectionManager *m_selectionManager;
+    MediaSessionService *m_mediaSession;
+    bool m_pillMusicMode = false;
 };

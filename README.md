@@ -10,6 +10,8 @@
 
 ## 核心特性
 
+窗口与界面重建：正式边框复用已验收的独立测试框 GDI+ 代码。主卡片右上角打开快捷操作，设置、历史、音乐和截图使用独立小窗，按 Escape 关闭；窄窗口保留搜索、结果和更多入口。交接与恢复位置见 [窗口重建说明](docs/WINDOW_UI_REBUILD.md)。
+
 | 模块 | 功能 |
 |---|---|
 | 多态悬浮卡片 | 药丸 (Pill) ↔ 完整卡片 (Card) 平滑状态切换，自由拖拽与八向拉伸 |
@@ -17,7 +19,7 @@
 | 原地截图翻译 | Windows.Graphics.Capture 全屏框选，逐行中英对照 |
 | 全局划词 | UI Automation → Clipboard 安全兜底 → OCR 三级降级 |
 | 生词本与历史 | SQLite 持久化，收藏标记、关键词检索、双语发音 |
-| 音乐控制 | GSMTC 系统媒体传输控制，支持 Spotify/网易云/Apple Music |
+| 灵动岛音乐与歌词 | 类似 iOS 灵动岛胶囊交互，旋转黑胶唱片律动、3柱音频均衡器跳动、实时双语歌词、Windows GSMTC 系统音频监听与直接切歌/暂停 |
 
 ---
 
@@ -34,8 +36,8 @@ C++/WinRT + Win32 (Windows 平台实现)
 ```
 
 ### 窗口设计原则
-- **透明矩形 QQuickWindow**，QML 负责圆角/阴影/描边/动画
-- Windows 层负责 Frameless / AlwaysOnTop / DWM Acrylic / 多屏 DPI
+- **分层 QWindow 宿主 + 离屏 QML 场景**，完整画面与窗口物理尺寸一次提交，QML 继续负责圆角、排版和控件
+- Qt 窗口层负责 Frameless / AlwaysOnTop / 多屏 DPI；GlassSurface 在 QML 内模拟深色玻璃
 - **独立紧贴窗口**：TranslatorWindow（Pill↔Card）/ OverlayWindow / SettingsWindow
 - 不使用 SetWindowRgn，避免圆角锯齿和失焦边框问题
 
@@ -44,11 +46,11 @@ C++/WinRT + Win32 (Windows 平台实现)
 ## 快速开始
 
 ### 环境要求
-- Qt 6.5+（**MSVC 2019/2022 64-bit** 版本，非 MinGW）
+- Qt 6.8+（**MSVC 2019/2022 64-bit** 版本，非 MinGW）
 - Visual Studio 2022（含 C++ 桌面开发工作负载，已确认安装在 `D:\VisualStudio2022`）
 - CMake 3.16+（Qt 安装器或 VS 自带）
 - C++20 编译器（MSVC 14.4+）
-- Windows 10 1809+（DWM Acrylic 需要 Windows 11 22621+）
+- Windows 10 1809+
 
 ### Qt 安装指引
 
@@ -143,3 +145,23 @@ lingust-desktop/
 ## 许可证
 
 MIT License
+
+
+## 桌面工具栏交互与验证（2026-09-08）
+
+四边/四角缩放合并高频输入，Windows 使用物理像素固定未拖动的边；按下、拖动和松手均保持标准 32px 大圆角。四角沿可见圆弧拖动。按钮按下即时反馈。极窄窗口可使用工具栏横向滚动条访问全部操作；正常宽度下顶部空白区域仍用于拖动窗口。
+
+运行桌面 QML 回归检查（需 Python 3、对应 Qt 的 qmltestrunner 及运行库）：
+
+```powershell
+python scripts/test_toolbars.py --qt-bin "D:/DevTools/QT/6.11.2/mingw_64/bin"
+```
+
+报告与截图输出到 `build/toolbar-check/`。该检查使用 UI 状态夹具，验证布局和交互，不代表真实翻译、OCR、系统媒体或物理输入延迟已验证。
+
+
+### 窄卡片与药丸使用补充
+
+长单词和音标会自动换行，窄卡片中的美/英发音独立成行。药丸宽度不足 340 时，复制、截图和音乐位于“⋯”更多菜单，发音与展开按钮常驻。
+
+当前本机验证环境为 Qt 6.11.2 + MinGW 13.1；独立菜单要求 Qt ≥6.8，前文旧 Qt 6.5/6.7 安装示例不适用于当前源码。Windows 默认 `QSG_RENDER_LOOP=basic`；排查显卡差异时可在启动前设置 `QSG_RENDER_LOOP=threaded` 对比，应用尊重显式配置。

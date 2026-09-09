@@ -14,60 +14,64 @@ ColumnLayout {
     property var antonyms: []
     property var wordForms: []
     property var tags: []
+    property real fontScale: DesignTokens.fontScale
     property bool compact: false
     property bool veryCompact: false
     property bool ultraCompact: false
 
     spacing: wordDetail.ultraCompact ? 6 : (wordDetail.veryCompact ? 8 : (wordDetail.compact ? 10 : 12))
 
-    // === 单词标题 + 音标 + 发音按钮行 (对齐 Web 端) ===
-    RowLayout {
+    // 长单词、音标和发音各有独立边界；窄窗口自动分行。
+    GridLayout {
+        id: wordHeader
         Layout.fillWidth: true
-        spacing: 8
+        Layout.minimumWidth: 0
+        columns: wordDetail.width < 360 * wordDetail.fontScale ? 1 : 2
+        columnSpacing: 8
+        rowSpacing: 6
 
-        // 单词 + 音标
-        RowLayout {
+        ColumnLayout {
             Layout.fillWidth: true
-            spacing: 8
-
+            Layout.minimumWidth: 0
+            spacing: 4
             Text {
+                objectName: "wordTitle"
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 text: wordDetail.word
                 color: DesignTokens.textPrimary
                 font.bold: true
-                font.pixelSize: Math.round((wordDetail.ultraCompact ? 15 : (wordDetail.compact ? 17 : 20)) * DesignTokens.fontScale)
+                font.pixelSize: Math.round((wordDetail.ultraCompact ? 15 : (wordDetail.compact ? 17 : 20)) * wordDetail.fontScale)
                 font.family: "Segoe UI"
-                elide: Text.ElideRight
-                visible: wordDetail.word.length > 0
+                wrapMode: Text.WrapAnywhere
+                visible: text.length > 0
             }
-
             Text {
+                objectName: "wordPhonetic"
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 text: wordDetail.phonetic.length > 0 ? (wordDetail.phonetic.startsWith("/") ? wordDetail.phonetic : "/" + wordDetail.phonetic + "/") : ""
                 color: "#93c5fd"
-                font.pixelSize: Math.round((wordDetail.ultraCompact ? 10 : (wordDetail.compact ? 11 : 12)) * DesignTokens.fontScale)
+                font.pixelSize: Math.round((wordDetail.ultraCompact ? 10 : (wordDetail.compact ? 11 : 12)) * wordDetail.fontScale)
                 font.family: "Consolas"
-                verticalAlignment: Text.AlignVCenter
-                visible: wordDetail.phonetic.length > 0
+                wrapMode: Text.WrapAnywhere
+                visible: text.length > 0
             }
         }
-
-        // 发音按钮 (美 / 英)
         Row {
-            Layout.alignment: Qt.AlignVCenter
+            objectName: "wordSpeechButtons"
+            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
             spacing: 4
-
             Repeater {
                 model: [
                     { label: "美", accent: "#60a5fa", langAccent: "us" },
                     { label: "英", accent: "#34d399", langAccent: "uk" }
                 ]
-
                 delegate: Rectangle {
-                    width: 38; height: 22; radius: 6
-                    color: "#14ffffff"
+                    width: 38; height: 24; radius: 6
+                    color: speechMouse.pressed ? "#33ffffff" : (speechMouse.containsMouse ? "#26ffffff" : "#14ffffff")
                     border.color: DesignTokens.borderSubtle
                     border.width: 1
-
                     Row {
                         anchors.centerIn: parent
                         spacing: 3
@@ -80,24 +84,17 @@ ColumnLayout {
                             text: modelData.label
                             color: modelData.accent
                             font.pixelSize: 10
-                            font.weight: Font.SemiBold
+                            font.weight: Font.DemiBold
                             anchors.verticalCenter: parent.verticalCenter
                         }
                     }
-
                     MouseArea {
+                        id: speechMouse
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onEntered: parent.color = "#26ffffff"
-                        onExited: parent.color = "#14ffffff"
-                        onClicked: {
-                            if (typeof appState !== "undefined" && appState) {
-                                appState.speak(wordDetail.word, "en", modelData.langAccent);
-                            }
-                        }
+                        onClicked: appState.speak(wordDetail.word, "en", modelData.langAccent)
                     }
-                    Behavior on color { ColorAnimation { duration: 150 } }
                 }
             }
         }
@@ -177,7 +174,7 @@ ColumnLayout {
                               ? wordDetail.definitions[0].partOfSpeech : "adj."
                         color: "#93c5fd"
                         font.pixelSize: 10
-                        font.weight: Font.SemiBold
+                        font.weight: Font.DemiBold
                     }
                 }
 
@@ -185,8 +182,8 @@ ColumnLayout {
                     Layout.fillWidth: true
                     text: wordDetail.definitions.length > 0 ? wordDetail.definitions[0].meaning : wordDetail.translatedText
                     color: "#f2ffffff"
-                    font.pixelSize: Math.round((wordDetail.ultraCompact ? 12 : (wordDetail.compact ? 14 : 15)) * DesignTokens.fontScale)
-                    font.weight: Font.SemiBold
+                    font.pixelSize: Math.round((wordDetail.ultraCompact ? 12 : (wordDetail.compact ? 14 : 15)) * wordDetail.fontScale)
+                    font.weight: Font.DemiBold
                     font.family: "Segoe UI"
                     wrapMode: Text.Wrap
                 }
@@ -225,7 +222,7 @@ ColumnLayout {
                             Layout.fillWidth: true
                             text: modelData.meaning ? modelData.meaning : ""
                             color: "#ccffffff"
-                            font.pixelSize: Math.round((wordDetail.ultraCompact ? 11 : 12) * DesignTokens.fontScale)
+                            font.pixelSize: Math.round((wordDetail.ultraCompact ? 11 : 12) * wordDetail.fontScale)
                             font.family: "Segoe UI"
                             wrapMode: Text.Wrap
                         }
@@ -245,7 +242,7 @@ ColumnLayout {
             text: "词形变化"
             color: DesignTokens.textPlaceholder
             font.pixelSize: 9
-            font.weight: Font.SemiBold
+            font.weight: Font.DemiBold
             font.letterSpacing: 1
             font.capitalization: Font.AllUppercase
         }
@@ -298,7 +295,7 @@ ColumnLayout {
             text: "双语例句"
             color: DesignTokens.textPlaceholder
             font.pixelSize: 9
-            font.weight: Font.SemiBold
+            font.weight: Font.DemiBold
             font.letterSpacing: 1
             font.capitalization: Font.AllUppercase
         }
@@ -378,7 +375,7 @@ ColumnLayout {
             text: "同义词"
             color: DesignTokens.textPlaceholder
             font.pixelSize: 9
-            font.weight: Font.SemiBold
+            font.weight: Font.DemiBold
             font.letterSpacing: 1
             font.capitalization: Font.AllUppercase
         }
@@ -434,7 +431,7 @@ ColumnLayout {
             text: "反义词"
             color: DesignTokens.textPlaceholder
             font.pixelSize: 9
-            font.weight: Font.SemiBold
+            font.weight: Font.DemiBold
             font.letterSpacing: 1
             font.capitalization: Font.AllUppercase
         }

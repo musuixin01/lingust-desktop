@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { InPlaceScreenshotTranslation } from '../../types';
 import { speakText } from '../../utils/speech';
+import { AppleAIBreathingGlow } from '../common/AppleAIBreathingGlow';
 
 interface InPlaceScreenshotCardProps {
   item: InPlaceScreenshotTranslation;
@@ -316,11 +317,15 @@ export const InPlaceScreenshotCard: React.FC<InPlaceScreenshotCardProps> = ({
         zIndex: isPinned ? 9999 : 9998,
       }}
       className={`bg-slate-900/92 dark:bg-slate-900/94 backdrop-blur-2xl border ${
-        !isPinned
+        loading
+          ? 'border-white/20 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.68)]'
+          : !isPinned
           ? 'border-emerald-400/40 shadow-[0_25px_60px_-15px_rgba(16,185,129,0.3)] ring-1 ring-emerald-400/20'
           : 'border-white/12 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.65)]'
-      } rounded-2xl flex flex-col relative z-10 transition-[box-shadow,border-color] duration-150 overflow-hidden text-slate-100 select-text`}
+      } rounded-2xl flex flex-col relative z-10 transition-[box-shadow,border-color] duration-500 overflow-hidden text-slate-100 select-text`}
     >
+      {/* 翻译中：Apple AI 风格向内呼吸流光与内边缘微光 (预缓存硬件合成图层，自然破晓唤醒) */}
+      <AppleAIBreathingGlow active={loading} />
       {/* 极简顶栏：自适应缩放（微型状态圆点 + 简洁语言胶囊） */}
       <div
         onMouseDown={handleDragStart}
@@ -626,7 +631,7 @@ export const InPlaceScreenshotCard: React.FC<InPlaceScreenshotCardProps> = ({
         {viewMode !== 'image-only' && (
           <div className="flex-1 pt-0.5 select-text">
             {loading ? (
-              <div className="py-6 flex flex-col items-center justify-center gap-2 text-white/50 text-center">
+              <div className="py-6 flex flex-col items-center justify-center gap-2 text-white/50 text-center animate-soft-fade">
                 <Sparkles className="w-4 h-4 text-blue-400 animate-spin" />
                 <span className="text-xs text-blue-300 tracking-wide">
                   正在智能识别与逐句对照翻译...
@@ -639,7 +644,7 @@ export const InPlaceScreenshotCard: React.FC<InPlaceScreenshotCardProps> = ({
                  - 正常尺寸：舒展阅读，清晰高对比度
                  ========================================================================= */
               <div
-                className={`font-sans leading-relaxed text-slate-100 ${
+                className={`animate-view-scale font-sans leading-relaxed text-slate-100 ${
                   isVeryCompact ? 'space-y-2.5' : isCompact ? 'space-y-3.5' : 'space-y-4'
                 }`}
               >

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS
+find_package(Qt6 6.8 REQUIRED COMPONENTS
     Core
     Gui
     Qml
@@ -17,7 +17,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
     Widgets
 )
 
-qt_standard_project_setup(REQUIRES 6.5)
+qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
 
 # 显式标记 DesignTokens 为 QML Singleton（QTP0004 自动生成可能漏识别）
@@ -56,11 +56,15 @@ set(SOURCES
     core/capture/CaptureManager.h
     core/ocr/OcrManager.cpp
     core/ocr/OcrManager.h
+    core/media/MediaSessionService.cpp
+    core/media/MediaSessionService.h
     providers/ocr/IOcrProvider.h
     platform/windows/hotkey/HotkeyManager.cpp
     platform/windows/hotkey/HotkeyManager.h
     platform/windows/mousehook/MouseHookManager.cpp
     platform/windows/mousehook/MouseHookManager.h
+    platform/windows/media/WindowsMediaManager.cpp
+    platform/windows/media/WindowsMediaManager.h
 )
 
 qt_add_executable(lingust ${SOURCES})
@@ -77,6 +81,7 @@ qt_add_qml_module(lingust
         ui/components/IconButton.qml
         ui/components/LanguageSelector.qml
         ui/pill/PillView.qml
+        ui/pill/MusicIslandCard.qml
         ui/card/CardView.qml
         ui/card/WordDetailView.qml
         ui/card/SearchInput.qml
@@ -107,6 +112,12 @@ qt_add_qml_module(lingust
         resources/icons/eye-off.svg
         resources/icons/external-link.svg
         resources/icons/rotate-ccw.svg
+        resources/icons/music.svg
+        resources/icons/play.svg
+        resources/icons/pause.svg
+        resources/icons/skip-back.svg
+        resources/icons/skip-forward.svg
+        resources/icons/disc.svg
 )
 
 target_link_libraries(lingust PRIVATE
@@ -121,7 +132,8 @@ target_link_libraries(lingust PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(lingust PRIVATE dwmapi)
+    target_sources(lingust PRIVATE platform/windows/window/WindowsResizeSession.cpp)
+    target_link_libraries(lingust PRIVATE dwmapi gdiplus)
     target_compile_definitions(lingust PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 
     if(MSVC)

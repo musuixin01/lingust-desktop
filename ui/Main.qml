@@ -1,328 +1,208 @@
 import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+import QtQuick.Controls.Basic as Basic
 import Linguist
 
 Item {
     id: root
-
     anchors.fill: parent
+    readonly property string currentMode: translatorWindow.currentMode
+    property color shellColor: "#ee1c202a"
+    property real shellOpacity: appState.cardOpacity
+    readonly property var stateObject: appState
 
-    property string currentMode: translatorWindow ? translatorWindow.currentMode : "pill"
-    property bool isDragging: false
-    property bool showSettings: false
-    property real entryScale: 0.92
-    property real entryOpacity: 0
-    property string resizeEdge: "none" // 记录当前缩放边缘：left/right/none
-
-    // 入场动画
-    Component.onCompleted: {
-        entryAnimation.start()
+    function openPanel(panel) {
+        panel.x = Math.max(16, Math.min(translatorWindow.x + 24, panel.screen.width - panel.width - 16))
+        panel.y = Math.max(32, Math.min(translatorWindow.y + 24, panel.screen.height - panel.height - 32))
+        panel.show()
+        panel.raise()
+        panel.requestActivate()
     }
 
-    // 退出动画
-    function quitApp() {
-        quitAnimation.start()
-    }
-
-    ParallelAnimation {
-        id: entryAnimation
-        NumberAnimation { target: root; property: "entryScale"; to: 1.0; duration: 400; easing.type: Easing.OutCubic }
-        NumberAnimation { target: root; property: "entryOpacity"; to: 1.0; duration: 500; easing.type: Easing.OutCubic }
-    }
-
-    ParallelAnimation {
-        id: quitAnimation
-        NumberAnimation { target: root; property: "entryScale"; to: 0.95; duration: 250; easing.type: Easing.InQuad }
-        NumberAnimation { target: root; property: "entryOpacity"; to: 0.0; duration: 300; easing.type: Easing.InQuad }
-        onFinished: Qt.quit()
-    }
-
-    // 整体缩放容器（入场动画用）
-    Item {
-        id: contentContainer
+    PillView {
         anchors.fill: parent
-        scale: root.entryScale
-        opacity: root.entryOpacity
-
-        // === 状态机：pill ↔ card ===
-        states: [
-            State {
-                name: "pill"
-                when: root.currentMode === "pill"
-                PropertyChanges { target: pillView; opacity: 1.0; visible: true; scale: 1.0 }
-                PropertyChanges { target: cardView; opacity: 0.0; visible: false; scale: 0.96 }
-            },
-            State {
-                name: "card"
-                when: root.currentMode === "card"
-                PropertyChanges { target: pillView; opacity: 0.0; visible: false; scale: 0.96 }
-                PropertyChanges { target: cardView; opacity: 1.0; visible: true; scale: 1.0 }
-            }
-        ]
-
-        transitions: [
-            Transition {
-                from: "pill"; to: "card"
-                ParallelAnimation {
-                    NumberAnimation { target: pillView; property: "opacity"; to: 0; duration: 120; easing.type: Easing.InQuad }
-                    NumberAnimation { target: pillView; property: "scale"; to: 0.96; duration: 200; easing.type: Easing.InQuad }
-                    NumberAnimation { target: cardView; property: "opacity"; to: 1; duration: 250; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: cardView; property: "scale"; to: 1.0; duration: 280; easing.type: Easing.OutCubic }
-                }
-            },
-            Transition {
-                from: "card"; to: "pill"
-                ParallelAnimation {
-                    NumberAnimation { target: cardView; property: "opacity"; to: 0; duration: 120; easing.type: Easing.InQuad }
-                    NumberAnimation { target: cardView; property: "scale"; to: 0.96; duration: 200; easing.type: Easing.InQuad }
-                    NumberAnimation { target: pillView; property: "opacity"; to: 1; duration: 250; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: pillView; property: "scale"; to: 1.0; duration: 280; easing.type: Easing.OutCubic }
-                }
-            }
-        ]
-
-        // === 药丸视图 ===
-        PillView {
-            id: pillView
-            anchors.fill: parent
-            isDragging: root.isDragging
-            visible: root.currentMode === "pill"
-            onExpandRequested: translatorWindow.expandToCard()
-        }
-
-        // === 卡片视图 ===
-        CardView {
-            id: cardView
-            anchors.fill: parent
-            isDragging: root.isDragging
-            resizeEdge: root.resizeEdge
-            visible: root.currentMode === "card" && !root.showSettings
-            onCollapseRequested: translatorWindow.collapseToPill()
-            onTranslateRequested: appState.translate()
-            onSettingsRequested: root.showSettings = true
-            onQuitRequested: root.quitApp()
-            onMinimizeToTaskbarRequested: translatorWindow.minimizeToTaskbar()
-        }
-
-        // 设置页面 - 缩放淡入动画
-        Item {
-            id: settingsContainer
-            anchors.fill: parent
-            visible: root.showSettings
-            opacity: root.showSettings ? 1.0 : 0.0
-            scale: root.showSettings ? 1.0 : 0.9
-            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-            Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-
-            // 半透明遮罩
-            Rectangle {
-                anchors.fill: parent
-                color: "#80000000"
-                opacity: root.showSettings ? 0.5 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: root.showSettings = false
-                }
-            }
-
-            SettingsView {
-                id: settingsView
-                anchors.centerIn: parent
-                width: Math.min(parent.width - 20, 420)
-                height: Math.min(parent.height - 20, 560)
-                z: 100
-                onCloseRequested: root.showSettings = false
-            }
-        }
+        visible: root.currentMode === "pill"
+        onExpandRequested: translatorWindow.expandToCard()
+        onMusicPanelRequested: root.openPanel(musicWindow)
+        onMoreRequested: root.openPanel(actionsWindow)
     }
-
-    // === 拖拽区域（仅顶部栏，不遮挡按钮）===
+    CardView {
+        anchors.fill: parent
+        visible: root.currentMode === "card"
+        isResizing: translatorWindow.isResizing
+        onMoveRequested: translatorWindow.startSystemMove()
+        onCollapseRequested: translatorWindow.collapseToPill()
+        onTranslateRequested: appState.translate()
+        onSettingsRequested: root.openPanel(settingsWindow)
+        onMusicPanelRequested: root.openPanel(musicWindow)
+        onHistoryRequested: { appState.refreshHistory(); root.openPanel(historyWindow) }
+        onScreenshotRequested: root.openPanel(screenshotWindow)
+        onMoreRequested: root.openPanel(actionsWindow)
+        onQuitRequested: Qt.quit()
+        onMinimizeToTaskbarRequested: translatorWindow.minimizeToTaskbar()
+    }
     MouseArea {
-        id: dragArea
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: root.currentMode === "pill" ? parent.height : 38
-        z: 1
-
-        propagateComposedEvents: true
-        hoverEnabled: false
-
-        onPressed: function(mouse) {
-            if (mouse.button === Qt.LeftButton) {
-                root.isDragging = true
-                if (translatorWindow) translatorWindow.startSystemMove()
-            }
-        }
-        onReleased: function() {
-            root.isDragging = false
-        }
+        anchors.fill: parent
+        visible: root.currentMode === "pill"
+        z: -1
+        onPressed: translatorWindow.startSystemMove()
     }
 
-    // === 8向缩放手柄（顶层，确保在拖拽区域之上）===
-    // 右下角
-    Rectangle {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        width: 18; height: 18
+    component UtilityWindow: Window {
+        id: utility
+        // A tool window must not wait for the invisible offscreen scene.
+        transientParent: null
+        property Component page
+        property bool pageLoaded: false
+        onVisibleChanged: if (visible) pageLoaded = true
+        width: 440
+        height: 580
+        minimumWidth: width
+        maximumWidth: width
+        minimumHeight: height
+        maximumHeight: height
+        visible: false
         color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        Loader { anchors.fill: parent; sourceComponent: utility.page; active: utility.pageLoaded }
         MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeFDiagCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow) {
-                    root.resizeEdge = "right"
-                    translatorWindow.startSystemResize(Qt.RightEdge | Qt.BottomEdge)
+            x: 24; y: 0; width: parent.width - 104; height: 22
+            onPressed: utility.startSystemMove()
+        }
+        Shortcut { sequence: "Escape"; onActivated: utility.hide() }
+    }
+    UtilityWindow {
+        id: settingsWindow
+        title: "Linguist 设置"
+        page: Component { SettingsView { onCloseRequested: settingsWindow.hide() } }
+    }
+    UtilityWindow {
+        id: historyWindow
+        title: "历史与生词本"
+        width: 460
+        height: 560
+        page: Component { HistoryView { onCloseRequested: historyWindow.hide() } }
+    }
+    UtilityWindow {
+        id: musicWindow
+        title: "音乐控制"
+        width: 360
+        height: 360
+        page: Component {
+            MusicIslandCard {
+                appState: root.stateObject
+                onCloseRequested: musicWindow.hide()
+                onSwitchTranslationRequested: { musicWindow.hide(); root.stateObject.setPillMusicMode(false) }
+            }
+        }
+    }
+    UtilityWindow {
+        id: screenshotWindow
+        title: "截图翻译"
+        width: 460
+        height: 540
+        page: Component {
+            Rectangle {
+                color: "#f51c202a"
+                radius: 24
+                border.color: "#40ffffff"
+                ScreenshotTranslationView {
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    onBackToTextRequested: screenshotWindow.hide()
+                    onRetakeRequested: { screenshotWindow.hide(); root.stateObject.triggerSelectionTranslation() }
                 }
             }
-            onReleased: root.resizeEdge = "none"
         }
     }
-    // 左下角
-    Rectangle {
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        width: 18; height: 18
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeBDiagCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow) {
-                    root.resizeEdge = "left"
-                    translatorWindow.startSystemResize(Qt.LeftEdge | Qt.BottomEdge)
+    component ActionButton: Basic.Button {
+        implicitHeight: 36
+        background: Rectangle {
+            radius: 10
+            color: parent.down ? "#33ffffff" : parent.hovered ? "#22ffffff" : "#10ffffff"
+            border.color: parent.activeFocus ? "#60a5fa" : "transparent"
+        }
+        contentItem: Text {
+            text: parent.text
+            color: "#f1f5f9"
+            font.pixelSize: 13
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+    }
+    UtilityWindow {
+        id: actionsWindow
+        title: "快捷操作"
+        width: 320
+        height: 520
+        page: Component {
+            Rectangle {
+                radius: 24
+                color: "#f51c202a"
+                border.color: "#40ffffff"
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 10
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "快捷操作"; color: "white"; font { pixelSize: 17; weight: Font.DemiBold } Layout.fillWidth: true }
+                        IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/close.svg"; tooltip: "关闭"; onClicked: actionsWindow.hide() }
+                    }
+                    Text { text: "翻译语言"; color: "#bac4d2"; font.pixelSize: 12 }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Basic.ComboBox {
+                            Layout.fillWidth: true
+                            model: ["en", "zh", "ja", "ko", "fr", "de", "es", "ru"]
+                            currentIndex: Math.max(0, model.indexOf(appState.sourceLang))
+                            onActivated: appState.setSourceLang(currentText)
+                        }
+                        IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/swap.svg"; tooltip: "交换语言"; onClicked: appState.swapLanguages() }
+                        Basic.ComboBox {
+                            Layout.fillWidth: true
+                            model: ["zh", "en", "ja", "ko", "fr", "de", "es", "ru"]
+                            currentIndex: Math.max(0, model.indexOf(appState.targetLang))
+                            onActivated: appState.setTargetLang(currentText)
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "翻译引擎"; color: "#bac4d2"; font.pixelSize: 12 }
+                        Basic.ComboBox {
+                            Layout.fillWidth: true
+                            model: ["offline", "gemini", "deepl", "youdao"]
+                            currentIndex: Math.max(0, model.indexOf(appState.engine))
+                            onActivated: appState.setEngine(currentText)
+                        }
+                    }
+                    Text { text: "文字大小  " + appState.fontSizePercent + "%"; color: "#bac4d2"; font.pixelSize: 12 }
+                    Basic.Slider {
+                        Layout.fillWidth: true
+                        from: 70; to: 150; stepSize: 10
+                        value: appState.fontSizePercent
+                        onMoved: appState.setFontSizePercent(Math.round(value))
+                    }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 8
+                        rowSpacing: 8
+                        ActionButton { Layout.fillWidth: true; text: "历史与生词本"; onClicked: { actionsWindow.hide(); appState.refreshHistory(); root.openPanel(historyWindow) } }
+                        ActionButton { Layout.fillWidth: true; text: appState.isFavorite ? "取消收藏" : "收藏"; onClicked: appState.setIsFavorite(!appState.isFavorite) }
+                        ActionButton { Layout.fillWidth: true; text: "音乐控制"; onClicked: { actionsWindow.hide(); root.openPanel(musicWindow) } }
+                        ActionButton { Layout.fillWidth: true; text: "截图翻译"; onClicked: { actionsWindow.hide(); appState.triggerSelectionTranslation(); root.openPanel(screenshotWindow) } }
+                        ActionButton { Layout.fillWidth: true; text: appState.isPinned ? "取消置顶" : "置顶"; onClicked: appState.setIsPinned(!appState.isPinned) }
+                        ActionButton { Layout.fillWidth: true; text: "设置"; onClicked: { actionsWindow.hide(); root.openPanel(settingsWindow) } }
+                    }
+                    ActionButton {
+                        Layout.fillWidth: true
+                        text: root.currentMode === "pill" ? "展开翻译卡片" : "收起为药丸"
+                        onClicked: { actionsWindow.hide(); translatorWindow.toggleMode() }
+                    }
+                    Item { Layout.fillHeight: true }
                 }
-            }
-            onReleased: root.resizeEdge = "none"
-        }
-    }
-    // 右上角
-    Rectangle {
-        anchors.right: parent.right
-        anchors.top: parent.top
-        width: 18; height: 18
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeBDiagCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow) {
-                    root.resizeEdge = "right"
-                    translatorWindow.startSystemResize(Qt.RightEdge | Qt.TopEdge)
-                }
-            }
-            onReleased: root.resizeEdge = "none"
-        }
-    }
-    // 左上角
-    Rectangle {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: 18; height: 18
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeFDiagCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow) {
-                    root.resizeEdge = "left"
-                    translatorWindow.startSystemResize(Qt.LeftEdge | Qt.TopEdge)
-                }
-            }
-            onReleased: root.resizeEdge = "none"
-        }
-    }
-    // 右边缘
-    Rectangle {
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: 24
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 24
-        width: 10
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeHorCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow) {
-                    root.resizeEdge = "right"
-                    translatorWindow.startSystemResize(Qt.RightEdge)
-                }
-            }
-            onReleased: root.resizeEdge = "none"
-        }
-    }
-    // 左边缘
-    Rectangle {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.topMargin: 24
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 24
-        width: 10
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeHorCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow) {
-                    root.resizeEdge = "left"
-                    translatorWindow.startSystemResize(Qt.LeftEdge)
-                }
-            }
-            onReleased: root.resizeEdge = "none"
-        }
-    }
-    // 下边缘
-    Rectangle {
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.leftMargin: 24
-        anchors.right: parent.right
-        anchors.rightMargin: 24
-        height: 10
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeVerCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow)
-                    translatorWindow.startSystemResize(Qt.BottomEdge)
-            }
-        }
-    }
-    // 上边缘（避开顶部拖拽区域的中间部分，只在两侧）
-    Rectangle {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.leftMargin: 120
-        anchors.right: parent.right
-        anchors.rightMargin: 120
-        height: 8
-        color: "transparent"
-        z: 100
-        visible: root.currentMode === "card"
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.SizeVerCursor
-            onPressed: function(m) {
-                if (m.button === Qt.LeftButton && translatorWindow)
-                    translatorWindow.startSystemResize(Qt.TopEdge)
             }
         }
     }

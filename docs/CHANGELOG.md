@@ -6,6 +6,353 @@
 
 ## [Unreleased] - 开发中
 
+### 2026-09-09 — 原生内容输入与测试边框统一
+
+- [Fixed] `WindowsResizeSession.*`：主窗口过程统一接收边框拖动和内容区鼠标输入，避免离屏 QML 窗口漏收点击。
+- [Changed] `WindowResizeSession.h`、`TranslatorWindow.*`：平台层将物理窗口坐标换算为逻辑坐标后，经 Core 接口投递给离屏界面；QML 不接触 Win32 API。
+- [Docs] `docs/API.md`、`docs/ARCHITECTURE.md`、`docs/WINDOW_UI_REBUILD.md`：同步原生输入转发职责与发布前证据边界。
+- [Changed] `.gitignore`：排除本地 Web 开发构建目录 `dev-dist/` 和 Python 缓存，避免将生成文件上传到仓库。
+
+### 2026-09-09 — 复用已验收测试边框，重建内部界面
+
+- [Refactored] `WindowsResizeSession.*`、`WindowResizeSession.h`、`CMakeLists.txt`：移入独立测试框的四圆弧路径、GDI+ AntiAlias/PixelOffsetHalf、内描边、DIB 与 UpdateLayeredWindow 路径，新增 GDI+ 生命周期管理。Windows 原生鼠标消息直接驱动拖动，使用同款 8px 边缘 / 34px 圆角范围命中及捕获流程。
+- [Refactored] `TranslatorWindow.*`：移除临时 QPainter 外壳与 8ms 轮询，持久 QML 画布仅提供内容。由平台对外壳和内容统一提交；输入位置根据物理矩形换算，尺寸动画从当前物理尺寸起步，避免缓存几何导致反向跳变。外部窗口尺寸/DPI 变更触发重绘。
+- [Changed] `Main.qml`、`CardView.qml`：固定顶部与底部、单一纵向内容滚动区；移除双重缩放/淡入、工具栏横向滚动及多组弹性间距。设置、历史、音乐、截图和更多操作采用独立紧凑窗口，首次打开才加载。
+- [Changed] `PillView.qml`、`IconButton.qml`、`DesignTokens.qml`：窄药丸更多按钮打开独立操作面板；图标支持 Tab/空格/回车与辅助名称、禁用状态；提高辅助文字对比度。保留现有词典、例句、发音、收藏、复制功能。
+- [Changed] `tests/qml/tst_card.qml` 针对重建后的实际分区验证防重叠；`tst_toolbar.qml` 增加键盘及禁用行为检查；屏幕探针验证实际鼠标目标窗口并匹配测试框圆弧命中规则。
+- [Docs] `WINDOW_UI_REBUILD.md` 记录架构选择、职责、验收方法与恢复包。同步 README、API、DESIGN_SYSTEM、ARCHITECTURE。
+
+### 2026-09-09 — 缩放微跳：外壳按物理像素绘制
+
+- [Refactored] `TranslatorWindow.h/.cpp`：QML 内容保留精确 QSizeF 逻辑尺寸，外壳背景、圆角遮罩和描边按最终物理像素矩形绘制，再与内容整帧提交。保留持久内容画布，防止透明帧回归。
+- [Changed] `Main.qml` 向宿主提供背景颜色、透明度；`GlassSurface.qml` 在宿主接管外壳时停止重复绘制，独立 QML 预览仍保留原外观。
+- [Fixed] `scripts/probe_resize_stability.py` 在定位鼠标后等待事件处理再按下，避免测量时尚未到达目标边缘便开始按键。
+- 对照：改前原生固定边漂移为 0，部分有效拖动的截图圆角切入偏差为 5px；仅保留 QSizeF 未消除此偏差。外壳重绘后的验证记录追加于本节。
+
+### 2026-09-09 — 修复启动后窗口全透明
+
+- [Fixed] `core/window/TranslatorWindow.h/.cpp`：软件渲染使用持久 QImage 画布，只在尺寸或 DPI 改变时重建并重新绑定目标。旧实现每帧创建透明图片，而场景只重绘变化区域，导致首帧之后整窗透明；原生窗口响应正常不能证明可见。
+- [Docs] ARCHITECTURE、DESIGN_SYSTEM 同步画布生命周期和实际可见性验收要求。
+- 验证：修改前采样 12 帧，第 2–12 帧 alpha 全为 0；修改后 12 帧均有非透明内容且提交成功。实际桌面截图已确认卡片、单词、音标、顶部与底部控件可见。临时采样代码验证后移除。
+
+### 2026-09-09 — 分层窗口整帧提交（开发中）
+
+- [Refactored] `TranslatorWindow` 从直接显示的 QQuickWindow 改为普通 QWindow 宿主，并以 QQuickRenderControl 软件后端把现有 QML 场景渲染到 ARGB 预乘图像。鼠标、滚轮、键盘、输入法和焦点事件转发到离屏场景。
+- [Refactored] `WindowResizeSession` / `WindowsResizeSession`：Windows 适配器先计算目标物理像素矩形，再通过 UpdateLayeredWindow 一次提交目标位置、尺寸和完整画面；不再先 SetWindowPos 再等待 QML 交换链。未使用 SetWindowRgn，也没有新增透明辅助窗口。
+- [Changed] 药丸/卡片尺寸动画也通过同一整帧提交路径，交互缩放使用同步渲染后的最新指针位置。
+- [Fixed] 原生屏幕探针发现并修复松手时 `applyInteractiveResize/endInteractiveResize` 相互调用导致的递归退出；结束路径现在只提交一次最终几何再清理捕获状态。
+- [Fixed] 移除交互缩放期间对全局鼠标按键状态的轮询，避免合成输入或高频拖动时会话被错误提前结束；缩放现在只由真实松手或鼠标捕获丢失收尾。
+- [Fixed] 鼠标捕获统一交给 Windows 缩放会话管理，避免 Qt 鼠标抓取与分层窗口原生捕获相互切换造成上边和圆角拖动偶发失效。
+- [Changed] Qt Quick Controls 固定使用 `Basic` 样式，减少原生样式覆写警告并保证离屏渲染下控件外观一致。
+- [Fixed] 药丸音乐详情从窗口外悬浮项改为 `360 × 300` 独立紧凑窗口，完整显示歌词、进度和播放控制，不再被药丸原生边界裁切。
+- [Changed] 移除主界面 400–500ms 的首帧缩放淡入，启动后立即响应鼠标输入。
+- [Changed] `scripts/probe_resize_stability.py` 支持用 `--edges` 单独复测指定边或圆角，便于隔离桌面合成输入造成的连续探针干扰。
+- [Refactored] 八向缩放命中与光标移入 TranslatorWindow，按 32px 可见圆弧带和 6px 边缘计算；删除 Main.qml 八套重复 MouseArea，避免离屏事件转发后指针抓取状态不一致，并修复无效 containmentMask 警告。
+- [Fixed] 边缘命中宽高取自 Platform 返回的当前物理窗口矩形并按 DPI 换算，不依赖外部恢复尺寸后可能尚未同步的 QWindow 逻辑宽高。
+- [Verified] 项目外单文件空框 `D:/AI Lab/AI Library/Doubao Workspace/lingust-border-drag-test/border_drag_test.cpp` 已由用户确认右边和下边不跳动；正式项目 Qt 6.11.2 / MinGW 构建成功，91 项 QML 布局、窄宽、圆角和即时反馈检查全部通过。正式窗口已启动供人工拖动验收；连续八向合成输入探针仍存在偶发未起拖，不能替代本轮人工结论。
+- [Docs] README、DESIGN_SYSTEM、API、ARCHITECTURE 同步新的窗口职责和验证边界。
+
+### 2026-09-09 — 固定像素锚点与取消圆角跳变
+
+- [Fixed] `ui/components/GlassSurface.qml`、`DesignTokens.qml`：卡片按下、拖动、松手均保持 32 逻辑像素圆角，删除 32→40→32 补偿。`tests/qml/tst_corners.qml` 逐像素比较右下角按下和松手前后的轮廓；旧版该测试失败。
+- [Refactored] `core/window/WindowResizeSession.h`、`platform/windows/window/WindowsResizeSession.h/.cpp`、`app/Application.cpp`、`CMakeLists.txt`：注入 Windows 缩放适配器，起始矩形、指针增量、固定边全部采用物理像素，一次 SetWindowPos 更新位置和尺寸，避免高 DPI 逻辑坐标分别取整造成对侧漂移。无 SetWindowRgn、无额外透明窗口。
+- [Fixed] `core/window/TranslatorWindow.h/.cpp`：待提交帧期间合并输入，frameSwapped 回到界面线程后继续应用最新位置；定时器仅负责静止时轮询，不称为显示器同步。模式切换结束拉伸，拉伸时阻止内容高度动画竞争。
+- [Fixed] `ui/Main.qml`：四角命中区域改为可见圆弧上的 6px 宽环带，修复原 8×8 热区落在圆角透明区的问题；顶部最窄时仍保留有效缩放区域。
+- [Added] `scripts/probe_resize_stability.py`：同一张截图提取可见边界与四角，分别记录原生坐标；覆盖八向拖动及按下/松手，对侧漂移要求 0 物理像素，轮廓偏差双向检查。
+- [Docs] DESIGN_SYSTEM、ARCHITECTURE、API 同步。下方上一轮旧探针的几何与截图不在同一时刻，且只检查曲线变浅；其数字不能证明圆角稳定，也不能据此确认 DWM 根因。以本节及新的实测记录为准。
+- 验证：Qt 6.11.2 / MinGW 构建成功；91 项 QML 检查通过（旧圆角切换实现为 90 通过、1 失败）；新版已启动。原生八向探针尚未完成：当前桌面报告 640×480，截图出现黑区及 screen grab failed，脚本拒绝将无效画面判为通过。真实拖动时的视觉稳定性仍待可用桌面复测；不宣称已达到绝对零跳动。探针增加运行前可用桌面检查及结束时窗口位置限界，README 同步固定圆角说明。
+
+### 2026-09-09 — 缩小时右边/底边圆角连续性重写
+
+- [Refactored] \`core/window/TranslatorWindow.h/.cpp\`、\`ui/Main.qml\`：八向拉伸从无限频率的 \`startSystemResize\` 改为与当前屏幕刷新率同步的可中断合并更新，同一帧只应用最新指针位置，松手/取消立即结束；保持对侧锚定及最小尺寸。删除未使用的 Win32 Acrylic/SetWindowRgn 死代码。
+- [Fixed] \`ui/components/GlassSurface.qml\`、\`DesignTokens.qml\`、\`CardView.qml\`：新增缩放态圆角补偿，拉伸时从 32px 增至 40px，抵消 Windows 对透明旧帧的瞬时压缩；松手后立即恢复 32px，不改变内容布局或窗口命中区。初始药丸最大高度同步限制为 60px。
+- [Added] \`scripts/probe_corner_continuity.py\`：在纯色背景上快速向内缩小右边和底边，直接测量两个相邻圆角的曲线切入深度。旧实现右角 26→21px、底角 25→21px，能稳定复现“变直角”；新实现右角最低 29/32px、底角最低 30/33px。
+- [Verified] 四边各移动 224–225 物理像素，对侧漂移最多 1px，绘制边界误差 0px；Qt 6.11.2 / MinGW 构建通过，91 项 QML 检查通过。旧二进制：\`build/bin/lingust.before-paced-resize.exe\`。
+- [Docs] README、DESIGN_SYSTEM、API、ARCHITECTURE 同步新的缩放节奏、圆角补偿和验证边界。
+
+### 2026-09-08 — 右边/底边透明窗口缩放后端对照
+
+- [Fixed] `app/main.cpp`：撤销 Windows 强制 `QSG_RENDER_LOOP=basic`，恢复 Qt 在 D3D11 上的默认 threaded 渲染，避免绘制与缩放输入共占界面线程。关闭整窗 4× MSAA；大圆角继续使用 QML Rectangle 抗锯齿。
+- [Research] Qt 6 Windows 默认 D3D11，threaded 在专用线程渲染；Microsoft 对同类透明 D3D 窗口的说明表明，窗口几何可能先于新交换链帧进入桌面合成，会短暂显示拉伸旧帧。
+- [Verified] 同机 125% DPI 对照：软件栅格与 OpenGL 在右边采样出现最多 4px 绘制边界误差，OpenGL 一次左边拖动未持续；D3D11/threaded 四边各移动 225px 时对侧漂移与采样误差均为 0px。这个探针能检测边界滞后，但仍不等于高速摄像。
+- [Docs] ARCHITECTURE 与 DESIGN_SYSTEM 同步渲染循环、抗锯齿及验证边界。参考 Qt 官方渲染循环/Windows 图形文档和 Microsoft DWM/DirectComposition 资料。
+
+### 2026-09-08 — 统一大圆角轮廓与四边缩放检查
+
+- [Fixed] `ui/components/GlassSurface.qml`：背景改为两层同尺寸、同半径、抗锯齿圆角；保留卡片 32px 大圆角、药丸半高圆角，移除越界 800×800 漫游柔光及圆角不一致的短条高光/阴影，修正渐变方向枚举。取消背景持续漫游和多重描边，减少无操作时的重绘。
+- [Fixed] `ui/card/CardView.qml`：底栏使用透明底色，由完整圆角背景统一绘制，修复底角外微弱方形残留。
+- [Added] `tests/qml/tst_corners.qml`、`tst_card.qml`：检查四角透出背景、完整卡片曲线外像素及最小尺寸；`scripts/test_toolbars.py --ui-root` 支持使用构建前 QML 对照。QtTest grabImage 返回合成 RGB，测试对比背景颜色而非 alpha。
+- [Added] `scripts/probe_all_edges.py`：四边原生拖动，比较对侧坐标与实际绘制边界；临时背景显式触发绘制，并取背景实测颜色，避免误将桌面或系统主题底色当成窗口边界。
+- 验证：旧 QML 在七种宽度的完整卡片底角检查失败，新版 90 项 QML 检查通过；Qt 6.11.2 / MinGW 构建通过。旧运行版四边各移动 225 物理像素时对侧漂移 0px、绘制边界采样误差最多 1px；未复现用户所见瞬间闪动，因此本轮没有凭猜测切换图形后端，保留已有 basic 渲染循环。
+- [Docs] DESIGN_SYSTEM、ARCHITECTURE 更新圆角绘制约束及验证边界。旧二进制：`build/bin/lingust.before-corners.exe`。
+- 运行验证：新版已启动且窗口响应正常；实际四边拖动采样中对侧漂移与绘制边界误差均为 0px，已检查原生窗口截图的四角轮廓。采样不是高速录像，仍不能证明瞬间闪动完全消失。原有设置/输入控件的原生样式自定义警告仍存在，不影响本轮主窗口加载。
+
+### 2026-09-08 — 窄卡片重叠、药丸图标与左侧缩放
+
+- [Fixed] `ui/card/WordDetailView.qml`：单词/音标分别换行，文字最小宽度为 0；窄窗口把美/英发音按钮放到独立行，长单词和 150% 字号不再覆盖按钮。修正无效的 SemiBold 枚举。
+- [Fixed] `ui/components/HoverScrollText.qml`：音标与译文采用独立限宽区域，窄且有足够高度时分行；仅译文在自己的裁剪视口内往返滚动，重新计算宽度后重置偏移。
+- [Fixed] `ui/pill/PillView.qml`：动作组按真实宽度布局，展开按钮始终显示；宽度小于 340 时复制/截图/音乐收进“更多”独立菜单。去掉覆盖按钮的悬停区、无实际行为的拉伸热区和 200ms 宽度动画；修正截图动作到已有 Core 方法。
+- [Fixed] `ui/components/MarqueeText.qml`：将悬停观察移出 Row 布局，避免布局内 anchors.fill 导致排布失效。
+- [Changed] `core/window/TranslatorWindow.h/.cpp`、`ui/Main.qml`：统一 beginSystemResize，用户接管缩放时停止尺寸动画，保留 Qt 原生八向缩放及对侧锚定。
+- [Changed] `app/main.cpp`：Windows 未显式指定时默认 QSG_RENDER_LOOP=basic，尝试减少透明窗口左侧缩放时几何与绘制不同步；允许环境变量覆盖。
+- [Changed] `CMakeLists.txt`：最低 Qt 版本明确为 6.8（独立 Popup.Window 菜单及已有 QTP0004 所需）。
+- [Added] `tests/qml/tst_narrow.qml`、`scripts/probe_native_resize.py`：文字/音标/按钮边界、药丸最小高度、字号及 Windows 原生左侧拖动检查。
+- 验证：QML 回归 81 项通过（包括初始化/清理）；覆盖 128–600 内容宽度、70/100/150% 字号、160–600 药丸宽度和 38/46/60 高度。原生缩放在 125% DPI 下对侧坐标无漂移；旧版采样也未捕获视觉跳动，因此绘制策略调整属于缓解措施，不能据此声称所有机器视觉抖动已消除。
+- 本轮交付：Qt 6.11.2 / MinGW 构建及实际启动通过；125% DPI 下从 500 逻辑宽度拖到最小 160，右边界坐标及采样画面边缘变化均为 0px。已核对实际窄卡片截图；旧二进制保留于 `build/bin/lingust.before-narrow-fix.exe`。
+- [Docs] README、DESIGN_SYSTEM、API、ARCHITECTURE 同步交互、接口、依赖及验证边界。
+
+
+### 2026-09-08 — 桌面端顶部/底部即时响应
+
+- [Fixed] `ui/card/CardView.qml`：移除顶部双侧间距、引擎/设置宽度、底部间距的追赶动画；加载状态改为已有的 `isTranslating`，解决无效属性绑定。
+- [Fixed] `ui/components/LanguageSelector.qml`、`TrafficLights.qml`：移除覆盖子按钮的 MouseArea，改为 HoverHandler；语言断点宽度立即更新，红绿灯固定占位，避免悬停引起重排。
+- [Changed] `ui/components/IconButton.qml`、`DesignTokens.qml`：按钮命中区域保持固定，仅图标按下即时缩小，颜色回落使用 60ms 共享时长。
+- [Changed] `ui/card/CardView.qml`：窄窗口滚动条使用 Basic 的 3px 灰蓝样式，修正卡片字体权重枚举；设置入口保留；极窄时工具栏横向滚动保留全部操作，底部按宽度减少辅助文字；滑块位置即时更新。
+- [Fixed] `ui/Main.qml`：交互内容层高于背景拖动区域，缩放热区收至外沿，减少鼠标拦截。
+- [Added] `tests/qml/tst_toolbar.qml`、`tests/qml/tst_card.qml`、`scripts/test_toolbars.py`：真实 QML 组件回归检查，7 种宽度 × 3 种状态及即时反馈/点击，共 30 项通过（包含套件初始化/清理）。测试使用 UI 状态夹具，不调用真实翻译服务。
+- [Fixed] `ui/pill/MusicIslandCard.qml`、`PillView.qml`：实际启动暴露音乐面板引用不存在的 GlassSurface/按钮属性；改用等色圆角 Rectangle 和 width/height，修正资源路径、媒体状态自引用及药丸加载绑定，恢复主 QML 加载。增加音乐组件加载回归检查。
+- [Docs] `docs/DESIGN_SYSTEM.md`、`docs/API.md`、`README.md` 同步桌面交互规则、加载状态与验证入口。Web/PWA 本轮未改动。
+- 验证：Qt 6.11.2 / MinGW 增量构建通过；30 项 QML 检查通过，已检查标准/极窄截图及实际主窗口启动。旧二进制保留于 `build/bin/lingust.before-toolbar.exe`。
+- 验证边界：仍有原有 WordDetailView 字重、GlassSurface 渐变方向及设置页原生样式的非致命警告，未扩展整页重构；未测量系统端到端输入延迟，不将无动画补间等同于物理 0ms。
+
+
+### [Changed]
+- **翻译完成后流光消散全面自然化，引入三阶段潮汐缓退消融状态机 (Tri-phase Organic Dissolve & Seamless Decay Transition)**：
+  - **根除退场断崖式暗淡与硬切**：
+    - 剖析翻译完成时单纯依赖 Ease-Out 曲线与无延迟 `visibility: hidden` 导致的光芒突然“塌陷一大截”、被浏览器提前隐匿的生硬体验；
+    - 在 `<AppleAIBreathingGlow />` 中设计三阶段生命周期状态机：`'idle'`（静止休眠） ➔ `'active'`（晨曦唤醒） ➔ `'dissolving'`（优雅消融）；
+  - **850ms 正弦缓降余晖退潮 (`.is-dissolving`)**：
+    - 翻译完成（`loading: false`）瞬间，光芒绝不断崖式熄灭，而是保持温润余晖；
+    - 采用符合自然光衰减规律的 **Ease-In-Out 正弦缓降曲线**（`cubic-bezier(0.37, 0, 0.63, 1)`），前段柔和释怀，中后段如水墨散入毛玻璃底色般自然蒸发；
+    - 边缘高精细线（`.apple-ai-edge-line`）同步轻度柔焦弥散（`filter: blur(2px)`），内向呼吸光幕（`.apple-ai-inward-bloom`）扩展漫散至 `blur(16px)`，双层复合消融；
+    - 退场全程 850ms 严格锁定 `visibility: visible`，直至完全消融隐入底色后才平滑切回 `'idle'` 休眠，实现与刚生成的译文呈现无缝视觉交接；
+  - **涉及文件**：
+    - `src/components/common/AppleAIBreathingGlow.tsx`
+    - `src/index.css`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+
+- **解决点击翻译瞬间动效生硬问题，重构为常驻合成层与柔焦破晓唤醒通道 (Organic Pre-cached Wake-up Bloom & Frictionless Activation)**：
+  - **根除 DOM 挂载引发的跳帧与硬切**：
+    - 剖析动态 `setShouldRender` 卸载/挂载导致浏览器渲染引擎丢失过渡、触发 Transition Cancellation 导致光晕突兀跳出的根本原因；
+    - 采用**预缓存 GPU 合成层架构（Pre-cached GPU Compositor Layer）**，光效节点常驻 DOM 树，配合 `will-change: opacity, transform, filter, visibility`；
+    - **非激活态**：`opacity: 0; visibility: hidden; filter: blur(12px) brightness(0.6); transform: scale(0.992);`，由 CSS `visibility: hidden` 在零开销下实现 100% 物理隐形，彻底杜绝任何漏光与点击阻挡；
+  - **750ms 晨曦柔焦破晓对焦唤醒（Soft-Focus Wake Bloom）**：
+    - 点击翻译瞬间，触发 Apple 阻尼缓动曲线（`cubic-bezier(0.22, 1, 0.36, 1)`）；
+    - 光线并非瞬间高亮跳出，而是从深层朦胧微光（`blur(12px)`、低亮度）在 750ms 内自然平稳升温、舒展对焦至晶莹剔透的高精琉璃光晕，无缝融入 3.8s 静息呼吸节奏；
+    - 翻译完成隐退同样以 750ms 舒缓退出，过渡如丝绸般连贯顺畅；
+  - **消除卡片容器边框色彩突变**：
+    - 去除卡片与药丸在 `loading` 时将边框生硬切换为 `border-transparent` 的类名跳变，保留恒定精致的磨砂玻璃边框底色，由流光层在上方自然绽放，消除任何底色突褪；
+  - **涉及文件**：
+    - `src/components/common/AppleAIBreathingGlow.tsx`
+    - `src/index.css`
+    - `src/components/translator/FloatingTranslatorCard.tsx`
+    - `src/components/screenshot/InPlaceScreenshotCard.tsx`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+
+- **流光呼吸严格受控仅在翻译时出现，过渡体验全面自然化 (Strict Translation-Only Lifecycle & Fluid Organic Transitions)**：
+  - **根除误显隐患（生命周期严格受控）**：
+    - 针对原生 CSS 关键帧动画 `opacity` 会无视并覆盖 Tailwind `opacity-0` 从而导致非翻译状态偶发微光的底层机制缺陷，专门重构封装独立受控组件 `<AppleAIBreathingGlow active={loading} />`；
+    - **非翻译状态**：彻底从 DOM 树卸载（`return null`），确保在未发起翻译时 100% 纯净无残留，绝不漏出一丝光芒；
+    - **翻译发起时**：通过 `requestAnimationFrame` 在 600ms 内以 Apple 人体工学贝塞尔曲线（`cubic-bezier(0.16, 1, 0.3, 1)`）平滑由 0 渐进至 100% 晨曦般苏醒漫射；
+    - **翻译完成时**：触发 600ms 舒缓退出过渡，光晕柔和隐退后干净卸载 DOM，彻底消除生硬截断；
+  - **呼吸律动物理曲线自然化**：
+    - 将呼吸周期由急促的 2.8s 拉长至悠扬舒适的 **3.8s 人体静息正弦周期**（`cubic-bezier(0.37, 0, 0.63, 1)`），流光周期同步调整为 4.8s；
+    - 向内收聚幅度由生硬的 `scale(0.965)` 优化为极为细腻轻柔的 `scale(0.982)` 配合 `14px` 柔光漫射，使光芒向内轻抚卡片内壁的吸气动效如同丝绸般顺滑自然；
+  - **涉及文件**：
+    - `src/components/common/AppleAIBreathingGlow.tsx` (新建)
+    - `src/index.css`
+    - `src/components/translator/FloatingTranslatorCard.tsx`
+    - `src/components/screenshot/InPlaceScreenshotCard.tsx`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+
+- **翻译中流光呼吸动效重构为 Apple AI 风格向内呼吸体系 (Apple Intelligence Inward Breathing Bloom)**：
+  - **由外向内呼吸流转**：彻底消除向外膨胀的 `scale(1.002)` 和刺眼的外向 `drop-shadow` / 紫色向外发光阴影，将呼吸光效全面重构为类似 Apple Intelligence（Siri 响应态）的向内弥散光幕（`apple-ai-inward-bloom`）；
+  - **向内呼吸物理曲线**：
+    - 平静态（0%/100%）：光芒收束在贴近边缘处，向内渗透深度较浅，中心 60%+ 彻底通透保护正文阅读；
+    - 呼吸吸气态（50%）：动画触发向内收缩聚拢（`transform: scale(0.965)` + `filter: blur(14px)`），宛如智能内核向内吸入能量，光雾柔和轻抚卡片内壁，产生极为逼真的内向渗透呼吸流体感；
+  - **双层精细结构**：
+    - 外轮廓：`.apple-ai-edge-line` 紧贴 `inset: 0` 勾勒 1.5px 高精七彩边框，伴随 9 色色相平滑流转，绝不向外突出生硬边角；
+    - 内侧光幕：`.apple-ai-inward-bloom` 使用径向遮罩（`radial-gradient ellipse 96% 90%`）实现从外边框向内部平滑衰减的流光弥散；
+  - **多形态完美贴合**：药丸模式（`rounded-full`）、卡片模式（`rounded-[32px]` / `rounded-2xl`）与截屏对照卡（`rounded-2xl`）均添加 `overflow-hidden`，保证内边缘光幕精准贴合圆角且外部阴影保持原生深色沉稳投影；
+  - **涉及文件**：
+    - `src/index.css`
+    - `src/components/translator/FloatingTranslatorCard.tsx`
+    - `src/components/screenshot/InPlaceScreenshotCard.tsx`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+
+### [Added]
+- **全应用自然动画与丝滑交互微过渡体系 (Natural Fluid Animation & Smooth Micro-Transitions)**：
+  - **七彩流光呼吸边框自然淡入淡出 (Organic Fade In/Out for Rainbow Aura)**：
+    - 消除请求开始/结束时七彩流光的突兀断崖式闪烁，引入 `transition-opacity duration-500 ease-out` 渐变通道；
+    - 翻译开始时如黎明朝霞般柔和绽放，翻译结束或取消时平滑淡出并回归通透毛玻璃边缘；
+    - 优化呼吸与流动物理曲线为 Apple 人体工学贝塞尔曲线（`4.2s ease-in-out` 流光 + `2.6s cubic-bezier(0.4, 0, 0.2, 1)` 呼吸），并开启 GPU `will-change: opacity, transform, filter` 硬件加速；
+  - **内容与页面切换轻微微缩放过渡 (Subtle View & Content Micro-Transitions)**：
+    - 新增 `.animate-view-scale`（`cubic-bezier(0.16, 1, 0.3, 1)`，从 0.985 缩放与 3px 轻位移丝滑落定）与 `.animate-soft-fade`；
+    - 翻译卡片结果生成时平滑展开展现，替换原有突兀的内容替换；
+    - 模拟桌面 Reader 切换选项卡（经典双语、前沿科技、双语散文、高频词汇）时，内容区增加轻量过渡与按键触觉弹性反馈；
+    - 设置独立窗口与历史记录窗口在切换标签页、搜索筛选及列表悬浮时，均应用自然缓动微交互与点击轻量回弹（`active:scale-[0.965]`）；
+    - 桌面壁纸切换时引入 `duration-700 ease-in-out` 背景色阶柔和渐变；
+  - **涉及文件**：
+    - `src/index.css`
+    - `src/components/translator/FloatingTranslatorCard.tsx`
+    - `src/components/screenshot/InPlaceScreenshotCard.tsx`
+    - `src/components/desktop/DesktopSimulator.tsx`
+    - `src/components/settings/SettingsWindow.tsx`
+    - `src/components/history/HistoryWindow.tsx`
+    - `src/components/common/PWAInstallModal.tsx`
+    - `src/App.tsx`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+
+- **翻译中七彩流光呼吸边框与环境光晕动效 (Rainbow Breathing Border & Aura Effect)**：
+  - **视觉呈现**：在文本翻译请求与截屏 OCR 翻译过程中（`loading === true`），窗口边框自动激活炫彩流动呼吸特效；
+  - **色彩构成**：精准应用苹果 Apple Intelligence / macOS 顶级色彩阵列（Coral Red `#ff3b30`、Orange `#ff9500`、Gold `#ffcc00`、Emerald `#34c759`、Teal `#00c7be`、Azure `#007aff`、Indigo `#5856d6`、Violet `#af52de`、Pink `#ff2d55`）；
+  - **双层光晕架构 (Dual-Layer Bloom Architecture)**：
+    - **内层高精流光线 (`.rainbow-breathing-border`)**：采用 CSS 遮罩内容盒排除技术（`-webkit-mask-composite: xor` / `mask-composite: exclude`），形成锐利清澈的 2px 七彩外框，中心绝对镂空透明，0 遮挡内部文字与控件；
+    - **外层漫反射呼吸光环 (`.rainbow-breathing-aura`)**：3.5px 软化微光晕配合 2.2s 人体静息呼吸节奏律动，伴随多层 `drop-shadow` 产生向外辐射的通透霓虹光雾；
+  - **全形态自适应覆盖**：
+    - **药丸模式 (`FloatingTranslatorCard` - Pill Mode)**：无缝契合 `rounded-full` 胶囊曲线，消除旧容器截断；
+    - **完整卡片模式 (`FloatingTranslatorCard` - Card Mode)**：自适应匹配 `rounded-[32px]` / `rounded-2xl`，提供奢华呼吸光圈；
+    - **原地截屏对照卡 (`InPlaceScreenshotCard`)**：在 OCR 与排版对照生成中同步呼吸，给予强有力的操作反馈；
+  - **涉及文件**：
+    - `src/index.css`
+    - `src/components/translator/FloatingTranslatorCard.tsx`
+    - `src/components/screenshot/InPlaceScreenshotCard.tsx`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+
+### [Fixed]
+- **修复 React Hook 顺序引发的 Internal React error (Expected static flag was missing)**：
+  - **根本原因**：`SettingsWindow` 与 `HistoryWindow` 组件在挂载时首行存在 `if (!isOpen) return null;` 提前退出逻辑，导致未打开时调用 0 个 Hook、打开时调用多个 Hook，违反了 React Hook 调用顺序铁律（Rules of Hooks），触发 React 19 Fiber 协调器抛出 `Internal React error: Expected static flag was missing`；
+  - **解决方案**：
+    - 将 `SettingsWindow.tsx` 与 `HistoryWindow.tsx` 内部的所有 `useState`、`useRef`、`useEffect` 无条件置于函数顶层统一调用，确保每次渲染 Hook 调用链绝对一致；
+    - 在 `App.tsx` 中对独立浮动窗口实施按需挂载渲染 (`{isSettingsOpen && <SettingsWindow ... />}`, `{isHistoryOpen && <HistoryWindow ... />}`)，彻底根除 Hook 计数器失配与无意义的后台监听消耗；
+  - **涉及文件**：
+    - `src/components/settings/SettingsWindow.tsx`
+    - `src/components/history/HistoryWindow.tsx`
+    - `src/App.tsx`
+    - `docs/CHANGELOG.md`
+
+### [Changed]
+- **设置与历史记录独立窗口化重构与全界面主题统一 (Settings & History Standalone Floating Windows & Global Theme Unification)**：
+  - **设置独立窗口化 (Settings Standalone Window)**：
+    - 将原有的全屏阻塞式模态抽屉重构为符合 Windows/macOS 桌面规范的**独立浮动窗口 (`SettingsWindow`)**；
+    - 配备标准的 macOS 三色红绿灯控制（红灯关闭、黄灯收缩为浮动药丸、绿灯居中复位）；
+    - 顶部支持流畅鼠标拖拽平移，取消背景遮罩层，允许用户在边看文档/使用翻译卡片的同时并列开启设置进行调试；
+    - 支持一键最小化为轻量桌面胶囊药丸，需要时随时还原；
+    - 全面规整五大分类选项卡：🤖 翻译引擎与专属密钥、⚡ 划词交互与触发方式、🎨 视觉排版与字号调节、🎵 灵动岛音乐与歌词律动、💻 独立桌面端与全局快捷键；
+  - **历史记录与生词本独立窗口化 (History Standalone Window)**：
+    - 将右侧固定抽屉升级为**独立浮动桌面窗口 (`HistoryWindow`)**，遵循 `设置/截图/历史记录使用独立窗口` 规范；
+    - 支持自由挪动、最小化收纳、实时搜索、生词本收藏筛选与一键清空；
+    - 摒弃旧版浅色背景类名，全面应用深邃星空磨砂玻璃（Deep Midnight Frosted Acrylic）质感；
+  - **全界面视觉主题 100% 统一度强化**：
+    - 重构 `PWAInstallModal` 桌面安装弹窗，全面适配红绿灯标题栏、磨砂玻璃高光阴影与精致发光按钮；
+    - 统一 `SelectionTooltip` 划词翻译悬浮气泡，彻底消除浅色模式下的突兀白底，始终保持深色通透毛玻璃与发光指示灯质感；
+    - 消除所有界面在深色 Sonoma / 极光壁纸下的样式反差，确保全局一致的奢华质感。
+  - **涉及文件**：
+    - `src/components/settings/SettingsWindow.tsx`
+    - `src/components/settings/SettingsModal.tsx`
+    - `src/components/settings/index.ts`
+    - `src/components/history/HistoryWindow.tsx`
+    - `src/components/history/HistoryDrawer.tsx`
+    - `src/components/history/index.ts`
+    - `src/components/common/PWAInstallModal.tsx`
+    - `src/components/translator/SelectionTooltip.tsx`
+    - `src/App.tsx`
+    - `docs/CHANGELOG.md`
+    - `docs/DESIGN_SYSTEM.md`
+    - `docs/ARCHITECTURE.md`
+
+### [Added]
+- **桌面独立客户端免下载即用模式 (PWA Standalone Desktop Integration)**：
+  - 集成 `vite-plugin-pwa` 规范化 Service Worker 与 Web App Manifest；
+  - 自动注册 `display: standalone` 桌面无边框窗口模式；
+  - 生成 `192x192`、`512x512`、`maskable` 高清品牌图标及 `apple-touch-icon`；
+  - 新增 `usePWAInstall` 桌面安装响应机制与 `PWAInstallModal` 引导弹窗；
+  - 在顶部模拟菜单栏、系统状态栏、快捷操作条及偏好设置中提供一键安装入口；
+  - 彻底解决传统桌面应用“改动一次需重新下载打包一次”的痛点，支持云端代码修改全自动热重载与实时生效。
+
+### [Fixed]
+- **浏览器 PWA 安装协议链修复与离线 Service Worker 就绪 (PWA Installability & Service Worker Activation)**：
+  - 修复 `index.html` 缺失 `<link rel="manifest" href="/manifest.webmanifest">` 导致浏览器无法识别渐进式 Web 应用的问题；
+  - 在 `server.ts` 补充 `express.static('public')` 静态文件服务中间件及 `application/manifest+json`、`application/javascript`（`Service-Worker-Allowed: /`）响应头，解决请求 `/manifest.webmanifest` 与 `/sw.js` 时错误回退为 HTML 的问题；
+  - 补全持久化静态 Web App Manifest 配置与完整缓存策略的 `public/sw.js` Service Worker，并在 `src/main.tsx` 完成自启动注册，彻底满足 Chromium / Edge 的标准 PWA 安装门槛；
+  - 将顶部模拟器状态栏的「安装桌面版」按钮优化为全尺寸可见，并在 `PWAInstallModal` 中补充 Chrome / Edge 浏览器菜单「保存并共享 / 应用 ➔ 安装 Linguist」多通路引导。
+  - **涉及文件**：`index.html`, `server.ts`, `src/main.tsx`, `public/manifest.webmanifest`, `public/sw.js`, `src/components/desktop/DesktopSimulator.tsx`, `src/components/common/PWAInstallModal.tsx`。
+
+- **Vite 客户端 HMR WebSocket 错误与 PWA 资产补齐 (Vite Client Error & PWA Assets Fix)**：
+  - 针对沙箱容器与禁用 HMR 环境下 `vite-plugin-pwa` 在开发模式下注入 `registerDevSW` 并通过已断开的 WebSocket 发送 `vite-plugin-pwa:dev-ready` 导致浏览器抛出 `[vite]` 控制台异常的问题，优化 `vite.config.ts` 中的 `devOptions.enabled: false`，彻底消除前端运行时错误；
+  - 运行 `scripts/generate_icons.py` 完整生成缺失的 PWA 图标资源（`pwa-192x192.png`、`pwa-512x512.png`、`pwa-maskable-512x512.png`、`apple-touch-icon.png`），避免网页引用不存在的图标导致 404/HTML 回退；
+  - 清理 `server.ts` 中未使用的 `fileURLToPath` 与 `__filename`/`__dirname` 声明，消除 esbuild 编译为 CommonJS 格式时的警告。
+  - **涉及文件**：`vite.config.ts`, `server.ts`, `public/apple-touch-icon.png`, `public/pwa-*.png`。
+
+- **开发服务依赖完整性修复与热重载恢复 (Dev Server Dependency & Service Restoration)**：
+  - 修复开发容器环境内 `node_modules` 依赖包同步缺失的问题，完成完整依赖重新拉取与链接；
+  - 成功重启并恢复本地 3000 端口全栈服务（Express 后端 API + Vite 中间件），经验证 `/api/health` 探针及静态页面路由均已恢复 200 正常响应。
+
+### [Changed]
+- **顶部栏与底部栏布局重构与极致视觉优化 (Top Bar & Bottom Bar Layout Refactoring & UI Polish)**：
+  - **顶部栏瘦身降噪 (Top Bar Cleanliness)**：
+    - 移除顶部栏生词本/历史记录按钮，消除与底部动作栏中已有历史入口的重复冗余，释放顶部标题栏呼吸感与横向空间；
+    - 顶部栏精简为核心操作群：图钉置顶（Pin）、灵动岛音乐（Music）、设置（Settings），彻底告别图标拥挤；
+  - **文本大小调节迁移至底部栏 (Font Size Adjuster Relocation to Bottom Bar)**：
+    - 将字体字号调节按钮从顶部工具栏下移至底部工具条，紧随翻译结果操作动作组，排布更符合自上而下阅读、自下而上调控的直觉动线；
+    - 弹窗改为自底向上平滑展开动效（`BottomRight` 变换原点，向上弹出），不遮挡核心原文与主译文展示区；
+    - 完整保留直接数值输入、百分比步进（60%~150%）、四档快捷预设（紧凑 80%、默认 92%、标准 100%、大字 115%）以及动态紧凑布局切换开关；
+  - **跨端 100% 同步实现**：
+    - Web 端：`src/components/translator/FloatingTranslatorCard.tsx`；
+    - 桌面端：`ui/card/CardView.qml`。
+
+### [Added]
+- **药丸集成灵动岛音乐与系统音频媒体总线监听 (Dynamic Island Music & Windows GSMTC Media Integration)**：
+  - **灵动岛胶囊交互模式 (Pill Dynamic Island Mode)**：
+    - 在药丸模式右侧工具条新增绿色音乐图标（🎵），点击即可无缝在“极简翻译模式”与“灵动岛音乐模式”之间自由切换；
+    - **极小胶囊形态 (Compact Pill State)**：
+      - 360° 匀速旋转黑胶唱片微缩唱盘（播放时转动、暂停时驻留）；
+      - 动态跳动 3 柱音频均衡器跳律动（带随机平滑缓动阻尼）；
+      - 歌曲标题、演唱者与当前行实时双语歌词跑马灯展示；
+      - 即时播放/暂停、下一首切歌与一键快速切回翻译；
+    - **展开大卡片形态 (Expanded Island Popover)**：
+      - 点击胶囊或卡片顶部音乐按钮，向上平滑呼出磨砂玻璃大卡片 `MusicIslandCard`；
+      - 展示高分辨率黑胶唱片唱针转动视效、歌曲名、艺术家、所属专辑；
+      - 沉浸式双语实时歌词卡片（中英对照同步滚动高亮）；
+      - 交互式播放进度条（支持鼠标任意拖动 Seek 跳进度与实时时长倒计时）；
+      - 全套播放控制按钮（上一曲、播放/暂停、下一曲）；
+  - **核心系统服务与 Windows 原生适配 (Core & Platform Layers)**：
+    - **Core 层**：新增 `core/media/MediaSessionService.h/.cpp`，负责媒体播放状态机、内置预设歌单（Lofi Rain & Coffee、Midnight Coding Flow 等）、歌词解析匹配与进度定时器；
+    - **Platform 层**：新增 `platform/windows/media/WindowsMediaManager.h/.cpp`，封装 Windows GSMTC (`GlobalSystemMediaTransportControlsSessionManager`)，监听系统活跃播放器（网易云音乐、QQ音乐、Spotify、Apple Music 与 Chrome/Edge 网页音频等）的播放状态与音轨元数据；
+    - **状态总线打通**：在 `AppState` 扩展 `musicPlaying`, `trackTitle`, `trackArtist`, `trackAlbum`, `trackDuration`, `trackPosition`, `currentLyric`, `currentLyricTranslation`, `pillMusicMode`，并提供 QML `Q_INVOKABLE` 控制接口；
+  - **Web 端与桌面端 100% 同步交付**：
+    - Web 端新增 `src/components/music/MusicIslandView.tsx`，与 `FloatingTranslatorCard.tsx` 完美集成；
+    - 桌面端新增 `ui/pill/MusicIslandCard.qml`，与 `PillView.qml` 和 `CardView.qml` 深度打通，并引入 `music.svg`, `play.svg`, `pause.svg`, `skip-back.svg`, `skip-forward.svg`, `disc.svg` 6 组矢量图标资源。
+
+### [Changed]
+- **顶部与底部栏 UI 动效与交互体验深度重构与对齐 (Top & Bottom Bar UI Animation & Interaction Polish)**：
+  - **顶部栏 (Top Bar)**：
+    - **统一动效缓动标准**：全面推行 120ms~150ms `Easing.OutCubic`，彻底取代原线性 `Easing.Linear`，带来丝滑物理惯性阻尼感；
+    - **翻译引擎胶囊 (Engine Indicator)**：
+      - 增加动态呼吸指示灯（翻译时加载闪烁、离线模式琥珀色、在线模式薄荷绿）；
+      - 悬停平滑高亮微缩放，支持鼠标点击直接顺次循环切换引擎（Gemini ➔ DeepL ➔ 有道 ➔ 离线）；
+    - **语言选择胶囊 (Language Selector)**：
+      - 双向互换按钮（`ArrowLeftRight`）支持 180° 平滑旋转动效与触控手型反馈；
+      - 语言下拉触发与切换增加微光反馈；
+    - **功能图标组 (Top Actions)**：
+      - 全平台顶部栏新增 **生词本/历史记录快捷入口**（History 图标），一键呼出历史抽屉；
+      - 设置齿轮按钮增加悬停旋转微动效，带来灵动的桌面级质感；
+    - **基础控件精修**：`IconButton.qml`、`TrafficLights.qml` 均标配手型光标（`Qt.PointingHandCursor`）、`scale: 1.08` 弹性悬停放大与激活光晕；
+  - **底部栏 (Unified Bottom Bar)**：
+    - **重构为单层一体化磨砂玻璃工具条**：将原分散的操作工具栏与尺寸底部栏合并为高度 36px 的统一轻量化栏目，消除双层边框堆叠割裂感；
+    - **Smart-Select 划词感知开关**：配置平滑缓动滑块与手型光标，开启/暂停状态实时色彩反馈；
+    - **右侧智能自适应功能组**：
+      - 翻译完成状态下：平滑展开复制（带绿色对勾成功反馈）、即时发音、生词本收藏、历史抽屉；
+      - 空状态下：自适应展现 `划词即翻 · Alt+Q` 极简热键提示；
+      - 窗口尺寸规格微标（如 `340×420`）以等宽字体低对比度雅致融入；
+  - **跨平台双端 100% 对齐**：Qt QML 桌面端（`CardView.qml`, `IconButton.qml`, `LanguageSelector.qml`, `TrafficLights.qml`）与 Web 端（`FloatingTranslatorCard.tsx`, `LanguageSelector.tsx`）全线同步交付。
+
 ### [Added]
 - **鼠标点击句子即时朗读发音 (Click-to-Speak Sentences)**：
   - **长句翻译面板**：

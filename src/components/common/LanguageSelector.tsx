@@ -25,6 +25,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   minimal = false,
 }) => {
   const [dropdownSide, setDropdownSide] = useState<'source' | 'target' | null>(null);
+  const [swapRotation, setSwapRotation] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentSource = SUPPORTED_LANGUAGES.find((l) => l.code === sourceLang) || SUPPORTED_LANGUAGES[0];
@@ -75,15 +76,17 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
+            setSwapRotation((r) => r + 180);
             onSwap();
           }}
-          className="text-white/30 hover:text-white/80 transition-all p-0.5 rounded-full hover:scale-110 active:scale-95 shrink-0"
+          className="text-white/40 hover:text-white transition-all p-0.5 rounded-full hover:scale-110 active:scale-95 shrink-0"
           title="互换语言"
         >
           <ArrowLeftRight
+            style={{ transform: `rotate(${swapRotation}deg)` }}
             className={`${
               minimal ? 'w-2.5 h-2.5' : 'w-3 h-3'
-            } text-white/40 hover:text-white/80 transition-transform active:rotate-180`}
+            } text-white/50 hover:text-white transition-transform duration-300 ease-out`}
           />
         </button>
 

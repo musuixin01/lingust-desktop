@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QQuickWindow>
+#include <QQuickStyle>
 #include <QSGRendererInterface>
 #include <QSurfaceFormat>
 #include <QDebug>
@@ -12,10 +13,17 @@ int main(int argc, char *argv[])
     // 最早期初始化崩溃处理器
     CrashHandler::instance()->init();
 
+    // Layered host renders QML into a premultiplied QImage before atomically
+    // submitting geometry and pixels to Windows.
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
+
     // 必须在创建 QApplication 之前设置表面格式，启用 alpha 通道
     QSurfaceFormat format;
     format.setAlphaBufferSize(8);
-    format.setSamples(4);
+    // Rounded QML Rectangles use Qt Quick's own antialiasing. Whole-window
+    // 4x MSAA adds an avoidable multisample resolve during every live resize.
+    format.setSamples(0);
     QSurfaceFormat::setDefaultFormat(format);
 
     QApplication app(argc, argv);
