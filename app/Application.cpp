@@ -21,6 +21,8 @@
 #include "core/capture/CaptureManager.h"
 #include "core/ocr/OcrManager.h"
 #include "platform/windows/ocr/WindowsOcrProvider.h"
+#include "core/auth/AuthManager.h"
+#include "platform/windows/auth/WindowsCredentialStore.h"
 
 Application::Application(QObject *parent)
     : QObject(parent)
@@ -47,7 +49,14 @@ int Application::run()
     m_captureManager = std::make_unique<CaptureManager>();
     m_ocrManager = std::make_unique<OcrManager>();
     m_windowsOcr = std::make_unique<WindowsOcrProvider>();
+    m_authManager = std::make_unique<AuthManager>(std::make_unique<WindowsCredentialStore>());
     m_ocrManager->setProvider(m_windowsOcr.get());
+
+    QObject::connect(m_authManager.get(), &AuthManager::accountChanged,
+                     m_appState.get(), &AppState::setAccountOwner);
+    m_appState->setAccountOwner(m_authManager->authenticated()
+                                    ? m_authManager->userId()
+                                    : QStringLiteral("local"));
 
     QObject::connect(m_appState.get(), &AppState::textCleared,
                      m_window.get(), &TranslatorWindow::resetCardToDefault);
@@ -81,6 +90,7 @@ int Application::run()
     m_engine->rootContext()->setContextProperty("translatorWindow", m_window.get());
     m_engine->rootContext()->setContextProperty("trayManager", m_tray.get());
     m_engine->rootContext()->setContextProperty("captureManager", m_captureManager.get());
+    m_engine->rootContext()->setContextProperty("authManager", m_authManager.get());
 
     QObject::connect(
         m_engine.get(), &QQmlApplicationEngine::objectCreationFailed,

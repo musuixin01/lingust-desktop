@@ -13,6 +13,8 @@ public:
     ~DatabaseManager() override;
 
     bool init();
+    void setOwnerId(const QString &ownerId);
+    QString ownerId() const { return m_ownerId; }
 
     // 历史记录
     Q_INVOKABLE void addHistory(const QString &sourceText, const QString &translatedText,
@@ -34,4 +36,5 @@ public:
 private:
     bool createTables();
     QSqlDatabase m_db;
+    QString m_ownerId = QStringLiteral("local");
 };

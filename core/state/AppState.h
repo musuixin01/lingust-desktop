@@ -135,6 +135,7 @@ public:
     Q_INVOKABLE void requestScreenshot();
     Q_INVOKABLE void exitScreenshotMode();
     Q_INVOKABLE QString completeTranslation() const;
+    Q_INVOKABLE void setAccountOwner(const QString &userId);
 
     QVariantList ocrLines() const { return m_ocrLines; }
     QString ocrImagePreview() const { return m_ocrImagePreview; }

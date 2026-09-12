@@ -105,6 +105,9 @@ Rectangle {
                 width: scrollArea.width - 12
                 spacing: 16
 
+                // ====== 账户区域（折叠卡片固定在顶部） ======
+                AccountPanel { }
+
                 // ----- SECTION 1: 翻译引擎与 API 配置 -----
                 RowLayout {
                     Layout.fillWidth: true
@@ -1063,4 +1066,5 @@ Rectangle {
             settingsView.testResultText = "API 连通测试通过！延迟 142ms";
         }
     }
+
 }

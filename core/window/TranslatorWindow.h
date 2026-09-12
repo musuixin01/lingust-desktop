@@ -126,4 +126,5 @@ private:
     Qt::Edges m_resizeHoverEdges;
     QRect m_animationOrigin;
     QRect m_nativeFrameGeometry;
+    bool m_imeComposing = false;
 };

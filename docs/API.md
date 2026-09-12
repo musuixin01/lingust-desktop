@@ -10,6 +10,87 @@
 
 所有接口均通过 HTTP POST / GET 调用，响应体统一采用 JSON 格式，字符集编码为 UTF-8。
 
+## 账户认证 API（v1）
+
+桌面端读取 `LINGUIST_AUTH_BASE_URL` 并仅接受 HTTPS 地址。认证服务可以用 `{ ... }` 或 `{ "data": { ... } }` 包装成功响应；错误建议统一返回 `{ "error": { "code": "...", "message": "..." } }`。所有接口应接受 `X-Request-Id` 和 `X-Client-Version`，敏感接口由服务端实施 IP、设备、账号多维限流。
+
+### 会话响应
+
+完成登录的接口统一返回：
+
+```json
+{
+  "access_token": "short-lived-token",
+  "refresh_token": "rotating-token",
+  "expires_in": 900,
+  "user": {
+    "id": "opaque-random-id",
+    "display_name": "用户昵称",
+    "email": "user@example.com",
+    "phone": "+86138****5678",
+    "avatar_url": "https://cdn.example.com/avatar",
+    "provider": "password"
+  }
+}
+```
+
+`access_token` 建议不超过 15 分钟；每次刷新都轮换 `refresh_token`，服务端需检测旧令牌重用并撤销整个令牌族。
+
+### `POST /v1/auth/login/password`
+
+请求：`identifier`、`password`、`device_name`、`platform`。`identifier` 可以是已验证邮箱或手机号。失败响应不得暴露账号是否存在。
+
+### `POST /v1/auth/register/password`
+
+请求：`identifier`、`password`、`display_name`、`locale`、`platform`。若要求邮箱验证，可以返回：
+
+```json
+{ "verification_required": true }
+```
+
+验证完成后用户从登录入口建立会话；服务端不得返回密码或密码摘要。
+
+### `POST /v1/auth/password/reset`
+
+请求：`email`、`locale`。无论邮箱是否存在均返回 202，避免账号枚举；邮件中的一次性令牌应短期有效且只能使用一次。
+
+### `POST /v1/auth/phone/code`
+
+请求：`phone`、`purpose`（`login` 或 `register`）、`locale`。成功返回 `{ "retry_after": 60 }`。验证码必须在 Redis 等短期存储中保存摘要、限制错误次数并在验证后立即销毁。
+
+### `POST /v1/auth/phone/verify`
+
+请求：`phone`、`code`、`purpose`、`display_name`、`platform`。验证成功返回统一会话响应。
+
+### `POST /v1/auth/wechat/start`
+
+请求：`platform`、`locale`。服务端创建随机 state 与一次性事务，返回：
+
+```json
+{
+  "transaction_id": "opaque-one-time-id",
+  "authorize_url": "https://open.weixin.qq.com/connect/qrconnect?..."
+}
+```
+
+微信 AppSecret 只能存在于服务端。桌面端使用系统浏览器打开 `authorize_url`。
+
+### `GET /v1/auth/wechat/status?transaction_id=...`
+
+等待时返回 HTTP 202 或 `{ "status": "pending" }`；完成后返回统一会话响应。事务应在 3 分钟内过期且成功后不可再次兑换。
+
+### `POST /v1/auth/token/refresh`
+
+请求：`refresh_token`、`platform`。成功返回新的统一会话响应并轮换刷新令牌；401/403 表示本机会话必须清除，临时 5xx 或断网不得让客户端丢失已保存凭据。
+
+### `POST /v1/auth/logout`
+
+请求头：`Authorization: Bearer <access_token>`。服务端撤销当前刷新会话。客户端会先清除本机凭据，因此网络失败不会阻止用户退出本机。
+
+### 桌面内部接口
+
+`AuthManager` 向 QML 暴露 `configured/authenticated/busy`、脱敏用户资料、验证码冷却时间和单一状态消息。QML 只能调用登录、注册、验证码、微信、重置密码、恢复和退出等语义方法，不能读取访问令牌或刷新令牌。`DatabaseManager::setOwnerId()` 只接受认证服务返回的用户 ID，并将历史与收藏查询限制在对应命名空间。
+
 ---
 
 ## TranslatorWindow 交互缩放（桌面内部接口，2026-09-09）

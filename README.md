@@ -1,7 +1,7 @@
 # Linguist 桌面悬浮翻译卡片 (Desktop Edition)
 
-> **版本**：v0.1.0
-> **状态**：可安装测试版
+> **版本**：v0.2.0-dev
+> **状态**：账户功能开发版
 > **技术栈**：Qt 6 Quick / QML + C++20 + Windows Runtime 媒体桥接
 
 轻量优雅、毛玻璃质感的桌面悬浮翻译卡片。支持多态药丸/卡片形态、四核翻译引擎、原地截图 OCR、全局划词与双语发音。
@@ -24,6 +24,7 @@
 | 多语言翻译 | 源语言可自动检测，也可自由选择中、英、日、韩、法、德、西、葡、意、俄、阿、越、泰语；目标语言可从同组实际语言中选择，已有文本会立即按新方向重译 |
 | 全局划词 | UI Automation → Clipboard 安全兜底 → OCR 三级降级 |
 | 生词本与历史 | SQLite 持久化，普通翻译与截图翻译筛选、收藏标记、关键词检索、双语发音 |
+| 账户 | 仅在设置中显示登录/注册；支持邮箱密码、手机号验证码与微信扫码协议，刷新令牌由 Windows 凭据管理器保存，历史和收藏按账户隔离 |
 | 系统音乐 | 药丸音乐模式显示封面、进度、歌词及上一首、播放/暂停、下一首；控制当前 Windows 系统媒体会话 |
 | 灵动岛系统音乐 | 通过 Windows GSMTC 自动读取当前播放器的歌曲、歌手、专辑、封面与播放状态；真实封面唱片随播放旋转，外环显示进度，药丸显示当前歌词，展开卡片可滚动浏览多行歌词，并支持切歌、播放/暂停及可用的进度跳转 |
 
@@ -37,7 +38,7 @@
 Qt Quick/QML (UI 层)
     ↓ property binding / signals
 C++20 Core (AppState, TranslationManager, SelectionManager,
-    OCRManager, CaptureManager, WindowManager, ShortcutManager)
+    OCRManager, CaptureManager, WindowManager, ShortcutManager, AuthManager)
     ↓ Platform Interfaces (ITranslationProvider, IOcrProvider, ...)
     ↓
 C++/Win32 + Windows Runtime 媒体桥接 (Windows 平台实现)
@@ -128,7 +129,8 @@ lingust-desktop/
 │   ├── selection/          # 划词管理
 │   ├── ocr/                # OCR 调度
 │   ├── capture/            # 截图管理
-│   └── media/              # 音乐控制
+│   ├── media/              # 音乐控制
+│   └── auth/               # 认证会话与安全存储接口
 ├── platform/               # 平台抽象
 │   ├── interfaces/         # ITranslationProvider, IOcrProvider, ...
 │   └── windows/            # Windows 平台实现
@@ -149,6 +151,7 @@ lingust-desktop/
 - [Windows 构建、安装与发布](./docs/RELEASE.md)
 - [全局功能验证记录](./docs/VALIDATION.md)
 - [v0.1.0 版本说明](./docs/RELEASE_NOTES_0.1.0.md)
+- [账户与认证架构](./docs/AUTHENTICATION.md)
 
 ---
 

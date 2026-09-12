@@ -2,8 +2,8 @@
 
 `TranslatorWindow` 通过 `nativeFrameX/Y/Width/Height` 暴露 Platform 层确认的真实原生矩形。外置页面排版面板只使用该矩形计算屏幕位置，避免 `UpdateLayeredWindow` 已移动窗口而 Qt 逻辑坐标尚未同步时发生漂移。原生鼠标按下使用消息携带的客户区坐标做边框命中，避免再次采样全局指针产生竞态。
 
-> **版本**：v0.1.0
-> **最后更新**：2026-09-12
+> **版本**：v0.2.0-dev
+> **最后更新**：2026-09-13
 
 ## 1. 分层架构
 
@@ -17,7 +17,7 @@
 ┌──────────────────────────▼──────────────────────────────┐
 │              Core 核心层 (C++20)                         │
 │  AppState / TranslationManager / SelectionManager        │
-│  OCRManager / CaptureManager / WindowManager             │
+│  OCRManager / CaptureManager / WindowManager / AuthManager│
 │  ShortcutManager / MediaManager                          │
 └──────────────────────────┬──────────────────────────────┘
                            │ Platform Interfaces
@@ -31,6 +31,7 @@
 │   Windows 平台层 (C++/Win32 + Windows Runtime Bridge)   │
 │  UI Automation / Graphics.Capture / Clipboard            │
 │  Global Hotkey / Mouse Hook / GSMTC / DWM / DPI         │
+│  Windows Credential Manager                              │
 └──────────────────────────┬──────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────┐
@@ -40,6 +41,8 @@
 ```
 
 ## 2. 窗口管理
+
+账户功能遵守同一分层：`AccountPanel.qml` 只存在于设置窗口并调用 `AuthManager`；Core 负责 HTTPS 协议、会话状态和输入校验；`ISecureCredentialStore` 隔离平台能力，Windows 实现使用凭据管理器。SQLite 的历史和收藏通过不可变用户 ID 做本机命名空间隔离。邮箱、短信、微信供应商密钥只允许存在于独立认证服务，完整边界见 [账户与认证架构](./AUTHENTICATION.md)。
 
 卡片内容量通过 `CardView.desiredWindowWidth/desiredWindowHeight` 映射为窗口尺寸：空内容和简短结果返回 220×200，丰富词典区或较多截图行返回 350×420。`Main.qml` 合并一帧内的连续内容更新后调用 `TranslatorWindow::adjustSizeToContent()`；原生宿主负责 180ms 宽高动画与分层窗口提交，DPI 换算只在原生提交边界发生。交互拉伸期间忽略自动尺寸请求，避免内容状态与用户拖动争用窗口几何。
 

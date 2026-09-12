@@ -20,7 +20,7 @@ env["QT_QPA_FONTDIR"] = str(Path(os.environ["WINDIR"]) / "Fonts")
 env["PATH"] = str(root / "build" / "bin") + os.pathsep + str(args.qt_bin) + os.pathsep + env["PATH"]
 with tempfile.TemporaryDirectory(prefix="linguist-toolbar-") as temp:
     stage = Path(temp)
-    for folder in ["components", "card", "pill"]:
+    for folder in ["components", "card", "pill", "settings"]:
         for source in (ui_root / folder).glob("*.qml"):
             text = source.read_text(encoding="utf-8").replace("import Linguist\n", "")
             text = text.replace("qrc:/qt/qml/Linguist/resources/", (root / "resources").as_uri() + "/")

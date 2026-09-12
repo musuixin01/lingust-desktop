@@ -35,6 +35,12 @@ bool DatabaseManager::init()
     return createTables();
 }
 
+void DatabaseManager::setOwnerId(const QString &ownerId)
+{
+    const QString normalized = ownerId.trimmed();
+    m_ownerId = normalized.isEmpty() ? QStringLiteral("local") : normalized.left(128);
+}
+
 bool DatabaseManager::createTables()
 {
     QSqlQuery query;
@@ -43,6 +49,7 @@ bool DatabaseManager::createTables()
     QString createHistory = R"(
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id TEXT NOT NULL DEFAULT 'local',
             source_text TEXT NOT NULL,
             translated_text TEXT,
             source_lang TEXT,
@@ -72,18 +79,25 @@ bool DatabaseManager::createTables()
         qWarning() << "Failed to add history preview URL:" << query.lastError().text();
         return false;
     }
+    if (!historyColumns.contains("owner_id")
+        && !query.exec("ALTER TABLE history ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local'")) {
+        qWarning() << "Failed to add history owner:" << query.lastError().text();
+        return false;
+    }
 
     // 收藏表
     QString createFavorites = R"(
         CREATE TABLE IF NOT EXISTS favorites (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source_text TEXT NOT NULL UNIQUE,
+            owner_id TEXT NOT NULL DEFAULT 'local',
+            source_text TEXT NOT NULL,
             translated_text TEXT,
             source_lang TEXT,
             target_lang TEXT,
             phonetic TEXT,
             definitions TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(owner_id, source_text)
         )
     )";
     if (!query.exec(createFavorites)) {
@@ -91,6 +105,49 @@ bool DatabaseManager::createTables()
         return false;
     }
 
+    QSet<QString> favoriteColumns;
+    if (query.exec("PRAGMA table_info(favorites)")) {
+        while (query.next())
+            favoriteColumns.insert(query.value(1).toString());
+    }
+    if (!favoriteColumns.contains("owner_id")) {
+        if (!m_db.transaction())
+            return false;
+        const bool migrated = query.exec(R"(
+            CREATE TABLE favorites_account_migration (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id TEXT NOT NULL DEFAULT 'local',
+                source_text TEXT NOT NULL,
+                translated_text TEXT,
+                source_lang TEXT,
+                target_lang TEXT,
+                phonetic TEXT,
+                definitions TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(owner_id, source_text)
+            )
+        )")
+            && query.exec(R"(
+                INSERT INTO favorites_account_migration
+                    (id, owner_id, source_text, translated_text, source_lang, target_lang,
+                     phonetic, definitions, timestamp)
+                SELECT id, 'local', source_text, translated_text, source_lang, target_lang,
+                       phonetic, definitions, timestamp FROM favorites
+            )")
+            && query.exec("DROP TABLE favorites")
+            && query.exec("ALTER TABLE favorites_account_migration RENAME TO favorites");
+        if (!migrated || !m_db.commit()) {
+            m_db.rollback();
+            qWarning() << "Failed to migrate favorites for account ownership:"
+                       << query.lastError().text();
+            return false;
+        }
+    }
+
+    if (!query.exec("CREATE INDEX IF NOT EXISTS idx_history_owner_time ON history(owner_id, timestamp DESC)"))
+        return false;
+    if (!query.exec("CREATE INDEX IF NOT EXISTS idx_favorites_owner_time ON favorites(owner_id, timestamp DESC)"))
+        return false;
     return true;
 }
 
@@ -100,8 +157,9 @@ void DatabaseManager::addHistory(const QString &sourceText, const QString &trans
                                   const QString &previewUrl)
 {
     QSqlQuery query;
-    query.prepare("INSERT INTO history (source_text, translated_text, source_lang, target_lang, engine, kind, preview_url) "
-                  "VALUES (?, ?, ?, ?, ?, ?, ?)");
+    query.prepare("INSERT INTO history (owner_id, source_text, translated_text, source_lang, target_lang, engine, kind, preview_url) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    query.addBindValue(m_ownerId);
     query.addBindValue(sourceText);
     query.addBindValue(translatedText);
     query.addBindValue(sourceLang);
@@ -117,7 +175,8 @@ QVariantList DatabaseManager::getHistory(int limit)
     QVariantList result;
     QSqlQuery query;
     query.prepare("SELECT id, source_text, translated_text, source_lang, target_lang, engine, timestamp, kind, preview_url "
-                  "FROM history ORDER BY timestamp DESC LIMIT ?");
+                  "FROM history WHERE owner_id = ? ORDER BY timestamp DESC LIMIT ?");
+    query.addBindValue(m_ownerId);
     query.addBindValue(limit);
     query.exec();
 
@@ -140,14 +199,17 @@ QVariantList DatabaseManager::getHistory(int limit)
 void DatabaseManager::clearHistory()
 {
     QSqlQuery query;
-    query.exec("DELETE FROM history");
+    query.prepare("DELETE FROM history WHERE owner_id = ?");
+    query.addBindValue(m_ownerId);
+    query.exec();
 }
 
 void DatabaseManager::deleteHistory(int id)
 {
     QSqlQuery query;
-    query.prepare("DELETE FROM history WHERE id = ?");
+    query.prepare("DELETE FROM history WHERE id = ? AND owner_id = ?");
     query.addBindValue(id);
+    query.addBindValue(m_ownerId);
     query.exec();
 }
 
@@ -156,8 +218,13 @@ void DatabaseManager::addFavorite(const QString &sourceText, const QString &tran
                                    const QString &phonetic, const QString &definitions)
 {
     QSqlQuery query;
-    query.prepare("INSERT OR REPLACE INTO favorites (source_text, translated_text, source_lang, target_lang, phonetic, definitions) "
-                  "VALUES (?, ?, ?, ?, ?, ?)");
+    query.prepare("INSERT INTO favorites (owner_id, source_text, translated_text, source_lang, target_lang, phonetic, definitions) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                  "ON CONFLICT(owner_id, source_text) DO UPDATE SET "
+                  "translated_text=excluded.translated_text, source_lang=excluded.source_lang, "
+                  "target_lang=excluded.target_lang, phonetic=excluded.phonetic, "
+                  "definitions=excluded.definitions, timestamp=CURRENT_TIMESTAMP");
+    query.addBindValue(m_ownerId);
     query.addBindValue(sourceText);
     query.addBindValue(translatedText);
     query.addBindValue(sourceLang);
@@ -171,8 +238,10 @@ QVariantList DatabaseManager::getFavorites()
 {
     QVariantList result;
     QSqlQuery query;
-    query.exec("SELECT id, source_text, translated_text, source_lang, target_lang, phonetic, definitions, timestamp "
-               "FROM favorites ORDER BY timestamp DESC");
+    query.prepare("SELECT id, source_text, translated_text, source_lang, target_lang, phonetic, definitions, timestamp "
+                  "FROM favorites WHERE owner_id = ? ORDER BY timestamp DESC");
+    query.addBindValue(m_ownerId);
+    query.exec();
 
     while (query.next()) {
         QVariantMap item;
@@ -192,16 +261,18 @@ QVariantList DatabaseManager::getFavorites()
 void DatabaseManager::removeFavorite(int id)
 {
     QSqlQuery query;
-    query.prepare("DELETE FROM favorites WHERE id = ?");
+    query.prepare("DELETE FROM favorites WHERE id = ? AND owner_id = ?");
     query.addBindValue(id);
+    query.addBindValue(m_ownerId);
     query.exec();
 }
 
 bool DatabaseManager::isFavorite(const QString &sourceText)
 {
     QSqlQuery query;
-    query.prepare("SELECT COUNT(*) FROM favorites WHERE source_text = ?");
+    query.prepare("SELECT COUNT(*) FROM favorites WHERE source_text = ? AND owner_id = ?");
     query.addBindValue(sourceText);
+    query.addBindValue(m_ownerId);
     query.exec();
     if (query.next()) {
         return query.value(0).toInt() > 0;

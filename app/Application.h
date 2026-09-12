@@ -13,6 +13,7 @@ class WindowsMediaManager;
 class CaptureManager;
 class OcrManager;
 class WindowsOcrProvider;
+class AuthManager;
 
 class Application : public QObject
 {
@@ -34,4 +35,5 @@ private:
     std::unique_ptr<CaptureManager> m_captureManager;
     std::unique_ptr<OcrManager> m_ocrManager;
     std::unique_ptr<WindowsOcrProvider> m_windowsOcr;
+    std::unique_ptr<AuthManager> m_authManager;
 };

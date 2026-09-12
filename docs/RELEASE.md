@@ -2,7 +2,7 @@
 
 发布前必须阅读并更新 [全局功能验证记录](./VALIDATION.md)，明确自动化通过项与仍需真实媒体、密钥或桌面交互确认的边界。
 
-当前版本说明见 [Linguist v0.1.0](./RELEASE_NOTES_0.1.0.md)。
+最近正式版本说明见 [Linguist v0.1.0](./RELEASE_NOTES_0.1.0.md)；当前源码处于 v0.2.0-dev，打包脚本会从 `CMakeLists.txt` 自动读取版本。
 
 ## 发布结构
 
@@ -20,9 +20,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package_windows.ps1 -InstallP
 
 输出文件：
 
-- `artifacts/Linguist-Setup-0.1.0-win64.exe`
-- `artifacts/Linguist-Setup-0.1.0-win64.exe.sha256`
-- `artifacts/Linguist-0.1.0-win64/`（免安装运行目录）
+- `artifacts/Linguist-Setup-<version>-win64.exe`
+- `artifacts/Linguist-Setup-<version>-win64.exe.sha256`
+- `artifacts/Linguist-<version>-win64/`（免安装运行目录）
 
 ## 发布前验证
 

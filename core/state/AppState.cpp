@@ -1017,3 +1017,10 @@ void AppState::seekTrack(int seconds)
 {
     emit musicSeekRequested(seconds);
 }
+
+void AppState::setAccountOwner(const QString &userId)
+{
+    m_database->setOwnerId(userId);
+    refreshHistory();
+    refreshFavorites();
+}

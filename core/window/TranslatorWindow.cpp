@@ -427,6 +427,14 @@ bool TranslatorWindow::forwardInputEvent(QEvent *event)
     }
     case QEvent::KeyPress:
     case QEvent::KeyRelease: {
+        // While IME composition is active, raw key events must not reach the
+        // scene -- the IME owns the keyboard until commit arrives.  Forwarding
+        // them here lets the TextField swallow Space/Enter and abort the
+        // composition before the commit string can be delivered.
+        if (m_imeComposing) {
+            event->accept();
+            return true;
+        }
         const auto *source = static_cast<QKeyEvent *>(event);
         QKeyEvent forwarded(source->type(), source->key(), source->modifiers(),
                             source->nativeScanCode(), source->nativeVirtualKey(),
@@ -437,6 +445,9 @@ bool TranslatorWindow::forwardInputEvent(QEvent *event)
     }
     case QEvent::InputMethod: {
         const auto *source = static_cast<QInputMethodEvent *>(event);
+        // Track composition: non-empty preedit means the IME is actively
+        // composing; empty preedit with commit means the composition closed.
+        m_imeComposing = !source->preeditString().isEmpty();
         QInputMethodEvent forwarded(source->preeditString(), source->attributes());
         forwarded.setCommitString(source->commitString(), source->replacementStart(), source->replacementLength());
         QCoreApplication::sendEvent(m_scene.get(), &forwarded);

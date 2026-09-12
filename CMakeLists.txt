@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(lingust VERSION 0.1.0 LANGUAGES CXX)
+project(lingust VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -30,6 +30,9 @@ set(SOURCES
     app/Application.h
     core/state/AppState.cpp
     core/state/AppState.h
+    core/auth/AuthManager.cpp
+    core/auth/AuthManager.h
+    core/auth/ISecureCredentialStore.h
     core/window/TranslatorWindow.cpp
     core/window/TranslatorWindow.h
     core/translation/TranslationManager.cpp
@@ -114,6 +117,7 @@ qt_add_qml_module(lingust
         ui/card/ScreenshotPreview.qml
         ui/overlay/ScreenCaptureOverlay.qml
         ui/settings/SettingsView.qml
+        ui/settings/AccountPanel.qml
     RESOURCES
         ui/components/DesignTokens.qml
         resources/icons/crop.svg
@@ -144,6 +148,12 @@ qt_add_qml_module(lingust
         resources/icons/skip-back.svg
         resources/icons/skip-forward.svg
         resources/icons/disc.svg
+        resources/icons/user.svg
+        resources/icons/mail.svg
+        resources/icons/smartphone.svg
+        resources/icons/message-circle.svg
+        resources/icons/log-out.svg
+        resources/icons/shield-check.svg
 )
 
 target_link_libraries(lingust PRIVATE
@@ -161,8 +171,10 @@ target_link_libraries(lingust PRIVATE
 if(WIN32)
     target_sources(lingust PRIVATE
         platform/windows/window/WindowsResizeSession.cpp
+        platform/windows/auth/WindowsCredentialStore.cpp
+        platform/windows/auth/WindowsCredentialStore.h
     )
-    target_link_libraries(lingust PRIVATE dwmapi gdiplus)
+    target_link_libraries(lingust PRIVATE dwmapi gdiplus advapi32)
     target_compile_definitions(lingust PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 
     if(MSVC)
@@ -184,6 +196,7 @@ set_target_properties(lingust PROPERTIES
 
 include(CTest)
 if(BUILD_TESTING)
+    find_package(Qt6 6.8 REQUIRED COMPONENTS Test)
     qt_add_executable(lingust_input_method_test
         tests/input_method_smoke.cpp
         core/window/TranslatorWindow.cpp
@@ -198,4 +211,32 @@ if(BUILD_TESTING)
     add_test(NAME input_method_smoke
         COMMAND lingust_input_method_test -platform offscreen
     )
+
+    qt_add_executable(lingust_auth_manager_test
+        tests/auth_manager_smoke.cpp
+        core/auth/AuthManager.cpp
+        core/auth/AuthManager.h
+        core/auth/ISecureCredentialStore.h
+        infrastructure/database/DatabaseManager.cpp
+        infrastructure/database/DatabaseManager.h
+    )
+    set_target_properties(lingust_auth_manager_test PROPERTIES WIN32_EXECUTABLE FALSE)
+    target_include_directories(lingust_auth_manager_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(lingust_auth_manager_test PRIVATE
+        Qt6::Core Qt6::Gui Qt6::Network Qt6::Sql Qt6::Test
+    )
+    add_test(NAME auth_manager_smoke COMMAND lingust_auth_manager_test)
+
+    if(WIN32)
+        qt_add_executable(lingust_windows_credential_test
+            tests/windows_credential_store_smoke.cpp
+            platform/windows/auth/WindowsCredentialStore.cpp
+            platform/windows/auth/WindowsCredentialStore.h
+            core/auth/ISecureCredentialStore.h
+        )
+        set_target_properties(lingust_windows_credential_test PROPERTIES WIN32_EXECUTABLE FALSE)
+        target_include_directories(lingust_windows_credential_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_link_libraries(lingust_windows_credential_test PRIVATE Qt6::Core Qt6::Test advapi32)
+        add_test(NAME windows_credential_store_smoke COMMAND lingust_windows_credential_test)
+    endif()
 endif()

@@ -6,6 +6,15 @@
 
 ## [Unreleased] - 开发中
 
+### 2026-09-13 — 设置页账户中心与持久会话
+
+- [Added] `AuthManager.*`、`ISecureCredentialStore.h`、`WindowsCredentialStore.*`：新增邮箱密码、手机号验证码、微信扫码、密码重置、会话刷新与退出协议；访问令牌仅驻留内存，刷新令牌持久化到 Windows 凭据管理器。
+- [Added] `AccountPanel.qml` 与账户图标：登录和注册只出现在设置页，以单层液态玻璃卡片完成折叠、方式切换、就地校验、加载反馈和登录资料状态。
+- [Changed] `DatabaseManager.*`、`AppState.*`：历史与收藏新增 `owner_id`，旧数据无损迁移到 `local` 命名空间，登录用户的数据按不可变账户 ID 隔离并长期保留。
+- [Fixed] `TranslatorWindow.*`：输入法预编辑期间由 IME 独占原始按键，避免空格或回车提前终止中文组合输入。
+- [Added] `tests/auth_manager_smoke.cpp`、`windows_credential_store_smoke.cpp`、`tst_account.qml`：覆盖会话安全保存与清除、Windows 凭据读写删除、无效账号拦截、数据隔离，以及邮箱、手机、微信账户交互。
+- [Docs] `docs/AUTHENTICATION.md`、`docs/API.md`、`docs/ARCHITECTURE.md`、`docs/DESIGN_SYSTEM.md`、`README.md`：记录认证服务拓扑、接口、安全边界、上线条件和交接方式。
+
 ### 2026-09-12 — 任务栏最小化与药丸边缘悬浮
 
 - [Docs] Windows 发布目录同时携带版本说明与全局验证记录，安装后可直接查看交付范围和验证边界。

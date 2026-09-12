@@ -49,7 +49,8 @@ New-Item -ItemType Directory -Path $docStage -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $projectRoot "README.md") -Destination $stagePath
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $stagePath
 Copy-Item -LiteralPath (Join-Path $projectRoot "docs\RELEASE.md") -Destination $docStage
-Copy-Item -LiteralPath (Join-Path $projectRoot "docs\RELEASE_NOTES_0.1.0.md") -Destination $docStage
+Get-ChildItem -LiteralPath (Join-Path $projectRoot "docs") -Filter "RELEASE_NOTES_*.md" |
+    Copy-Item -Destination $docStage
 Copy-Item -LiteralPath (Join-Path $projectRoot "docs\VALIDATION.md") -Destination $docStage
 
 $compilerCandidates = @(
