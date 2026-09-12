@@ -39,7 +39,7 @@ signals:
 
 private:
     void tryNextEngine();
-    void retryCurrentEngine();
+    void retryActiveProvider(quint64 requestId, ITranslationProvider *provider);
 
     QMap<QString, ITranslationProvider*> m_providers;
     QString m_currentEngine;
@@ -47,6 +47,8 @@ private:
     int m_maxRetries;
     int m_retryCount;
     int m_fallbackIndex;
+    quint64 m_requestId = 0;
+    ITranslationProvider *m_activeProvider = nullptr;
 
     QString m_pendingText;
     QString m_pendingSourceLang;

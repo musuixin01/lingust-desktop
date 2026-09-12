@@ -4,13 +4,6 @@
 #include <QString>
 #include <QVariantList>
 #include <QTimer>
-#include <QVector>
-
-struct LyricEntry {
-    int timeSeconds;
-    QString text;
-    QString translation;
-};
 
 class MediaSessionService : public QObject
 {
@@ -23,11 +16,14 @@ class MediaSessionService : public QObject
     Q_PROPERTY(int positionSeconds READ positionSeconds NOTIFY positionChanged)
     Q_PROPERTY(QString currentLyric READ currentLyric NOTIFY lyricChanged)
     Q_PROPERTY(QString currentLyricTranslation READ currentLyricTranslation NOTIFY lyricChanged)
+    Q_PROPERTY(QString coverDataUrl READ coverDataUrl NOTIFY trackChanged)
+    Q_PROPERTY(QVariantList lyrics READ lyrics NOTIFY lyricsListChanged)
+    Q_PROPERTY(int currentLyricIndex READ currentLyricIndex NOTIFY lyricChanged)
+    Q_PROPERTY(bool lyricsSynchronized READ lyricsSynchronized NOTIFY lyricsListChanged)
     Q_PROPERTY(bool isSystemMediaConnected READ isSystemMediaConnected NOTIFY systemMediaStateChanged)
 
 public:
     explicit MediaSessionService(QObject *parent = nullptr);
-    ~MediaSessionService() override;
 
     bool isPlaying() const { return m_isPlaying; }
     QString title() const { return m_title; }
@@ -35,43 +31,44 @@ public:
     QString album() const { return m_album; }
     int durationSeconds() const { return m_durationSeconds; }
     int positionSeconds() const { return m_positionSeconds; }
-    QString currentLyric() const { return m_currentLyric; }
-    QString currentLyricTranslation() const { return m_currentLyricTranslation; }
+    QString currentLyric() const;
+    QString currentLyricTranslation() const { return {}; }
+    QString coverDataUrl() const { return m_coverDataUrl; }
+    QVariantList lyrics() const { return m_lyrics; }
+    int currentLyricIndex() const { return m_currentLyricIndex; }
+    bool lyricsSynchronized() const { return m_lyricsSynchronized; }
     bool isSystemMediaConnected() const { return m_isSystemMediaConnected; }
 
-    Q_INVOKABLE void play();
-    Q_INVOKABLE void pause();
-    Q_INVOKABLE void togglePlay();
-    Q_INVOKABLE void next();
-    Q_INVOKABLE void previous();
-    Q_INVOKABLE void seek(int seconds);
-    Q_INVOKABLE void loadPreset(int index);
+    void applySystemSnapshot(bool connected, bool playing,
+                             const QString &title, const QString &artist,
+                             const QString &album, const QString &coverDataUrl,
+                             int durationSeconds,
+                             int positionSeconds);
+    void setLyrics(const QVariantList &lines, bool synchronized, int matchedDurationSeconds);
+    void clearLyrics();
 
 signals:
     void playbackStateChanged(bool playing);
     void trackChanged(const QString &title, const QString &artist);
     void positionChanged(int seconds);
     void lyricChanged(const QString &lyric, const QString &translation);
+    void lyricsListChanged();
     void systemMediaStateChanged(bool connected);
-
-private slots:
-    void onTick();
 
 private:
     void updateActiveLyric();
-    void loadTrack(int index);
 
     bool m_isPlaying = false;
     QString m_title;
     QString m_artist;
     QString m_album;
-    int m_durationSeconds = 180;
+    QString m_coverDataUrl;
+    int m_durationSeconds = 0;
     int m_positionSeconds = 0;
-    QString m_currentLyric;
-    QString m_currentLyricTranslation;
-    bool m_isSystemMediaConnected = true;
-
-    int m_currentTrackIndex = 0;
-    QVector<LyricEntry> m_lyrics;
-    QTimer m_tickTimer;
+    bool m_isSystemMediaConnected = false;
+    QVariantList m_lyrics;
+    int m_currentLyricIndex = -1;
+    bool m_lyricsSynchronized = false;
+    bool m_hasSystemTimeline = false;
+    QTimer m_estimatedTimelineTimer;
 };

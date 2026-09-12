@@ -6,6 +6,7 @@
 #include <QQmlError>
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QTimer>
 #include <cstdio>
 
 #include "core/state/AppState.h"
@@ -16,6 +17,10 @@
 #include "core/window/TrayManager.h"
 #include "platform/windows/hotkey/HotkeyManager.h"
 #include "platform/windows/mousehook/MouseHookManager.h"
+#include "platform/windows/media/WindowsMediaManager.h"
+#include "core/capture/CaptureManager.h"
+#include "core/ocr/OcrManager.h"
+#include "platform/windows/ocr/WindowsOcrProvider.h"
 
 Application::Application(QObject *parent)
     : QObject(parent)
@@ -26,6 +31,10 @@ Application::~Application() = default;
 
 int Application::run()
 {
+    // The translator and capture overlay intentionally hand visibility to each
+    // other. Keep the tray process alive during the short interval with no window.
+    QGuiApplication::setQuitOnLastWindowClosed(false);
+
     m_appState = std::make_unique<AppState>();
     m_window = std::make_unique<TranslatorWindow>();
 #ifdef Q_OS_WIN
@@ -34,11 +43,44 @@ int Application::run()
     m_tray = std::make_unique<TrayManager>();
     m_hotkey = std::make_unique<HotkeyManager>();
     m_mouseHook = std::make_unique<MouseHookManager>();
+    m_windowsMedia = std::make_unique<WindowsMediaManager>();
+    m_captureManager = std::make_unique<CaptureManager>();
+    m_ocrManager = std::make_unique<OcrManager>();
+    m_windowsOcr = std::make_unique<WindowsOcrProvider>();
+    m_ocrManager->setProvider(m_windowsOcr.get());
+
+    QObject::connect(m_appState.get(), &AppState::textCleared,
+                     m_window.get(), &TranslatorWindow::resetCardToDefault);
+
+    QObject::connect(m_captureManager.get(), &CaptureManager::screenshotCaptured,
+                     m_appState.get(), [this](const QImage &image) {
+        m_appState->beginScreenshotTranslation(m_captureManager->selectionPreviewUrl());
+        m_ocrManager->recognize(image, m_appState->sourceLang());
+    });
+    QObject::connect(m_captureManager.get(), &CaptureManager::captureFailed,
+                     m_appState.get(), &AppState::setOcrError);
+    QObject::connect(m_ocrManager.get(), &OcrManager::recognitionReady,
+                     m_appState.get(), &AppState::submitOcrText);
+    QObject::connect(m_ocrManager.get(), &OcrManager::recognitionError,
+                     m_appState.get(), &AppState::setOcrError);
+
+    QObject::connect(m_windowsMedia.get(), &WindowsMediaManager::snapshotChanged,
+                     m_appState.get(), &AppState::updateSystemMediaSession);
+    QObject::connect(m_appState.get(), &AppState::musicToggleRequested,
+                     m_windowsMedia.get(), &WindowsMediaManager::sendToggle);
+    QObject::connect(m_appState.get(), &AppState::musicNextRequested,
+                     m_windowsMedia.get(), &WindowsMediaManager::sendNext);
+    QObject::connect(m_appState.get(), &AppState::musicPreviousRequested,
+                     m_windowsMedia.get(), &WindowsMediaManager::sendPrevious);
+    QObject::connect(m_appState.get(), &AppState::musicSeekRequested,
+                     m_windowsMedia.get(), &WindowsMediaManager::sendSeek);
+    m_windowsMedia->start();
 
     m_engine = std::make_unique<QQmlApplicationEngine>();
     m_engine->rootContext()->setContextProperty("appState", m_appState.get());
     m_engine->rootContext()->setContextProperty("translatorWindow", m_window.get());
     m_engine->rootContext()->setContextProperty("trayManager", m_tray.get());
+    m_engine->rootContext()->setContextProperty("captureManager", m_captureManager.get());
 
     QObject::connect(
         m_engine.get(), &QQmlApplicationEngine::objectCreationFailed,
@@ -52,20 +94,24 @@ int Application::run()
     );
 
     // 托盘菜单信号连接
-    QObject::connect(m_tray.get(), &TrayManager::showRequested, m_window.get(), &TranslatorWindow::show);
+    QObject::connect(m_tray.get(), &TrayManager::showRequested,
+                     m_window.get(), &TranslatorWindow::restoreFromTaskbar);
     QObject::connect(m_tray.get(), &TrayManager::hideRequested, m_window.get(), &TranslatorWindow::hide);
     QObject::connect(m_tray.get(), &TrayManager::quitRequested, QGuiApplication::instance(), &QGuiApplication::quit);
-    QObject::connect(m_tray.get(), &TrayManager::screenshotRequested, m_appState.get(), &AppState::triggerSelectionTranslation);
+    QObject::connect(m_tray.get(), &TrayManager::screenshotRequested,
+                     m_appState.get(), &AppState::requestScreenshot);
 
     // 全局快捷键
     // Ctrl+Shift+T: 划词翻译
     m_hotkey->registerHotkey(1, Qt::Key_T, Qt::ControlModifier | Qt::ShiftModifier);
-    // Ctrl+Shift+S: 截图翻译（暂用划词代替）
+    // Ctrl+Shift+S: 截图翻译
     m_hotkey->registerHotkey(2, Qt::Key_S, Qt::ControlModifier | Qt::ShiftModifier);
     QObject::connect(m_hotkey.get(), &HotkeyManager::hotkeyTriggered, m_appState.get(), [this](int id) {
-        if (id == 1 || id == 2) {
+        if (id == 1) {
             m_window->show();
             m_appState->triggerSelectionTranslation();
+        } else if (id == 2) {
+            m_appState->requestScreenshot();
         }
     });
 
@@ -114,6 +160,10 @@ int Application::run()
     }
 
     m_window->show();
+    // Qt can finalize the HWND procedure while showing the window. Reattach
+    // the platform input/resize session after that native transition.
+    QTimer::singleShot(0, m_window.get(), &TranslatorWindow::refreshNativeSession);
+    QTimer::singleShot(120, m_window.get(), &TranslatorWindow::refreshNativeSession);
     m_tray->show();
     return QGuiApplication::exec();
 }

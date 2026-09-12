@@ -12,6 +12,7 @@ DeepLProvider::DeepLProvider(QObject *parent)
 
 void DeepLProvider::translate(const QString &text, const QString &sourceLang, const QString &targetLang)
 {
+    const quint64 requestId = ++m_requestId;
     if (m_apiKey.isEmpty()) {
         emit translationError("DeepL API Key 未配置");
         return;
@@ -34,6 +35,7 @@ void DeepLProvider::translate(const QString &text, const QString &sourceLang, co
     request.setTransferTimeout(15000); // 15秒超时
 
     QNetworkReply *reply = m_network->post(request, params.toString(QUrl::FullyEncoded).toUtf8());
+    reply->setProperty("requestId", QVariant::fromValue<qulonglong>(requestId));
     connect(reply, &QNetworkReply::finished, this, &DeepLProvider::onReplyFinished);
 }
 
@@ -41,6 +43,11 @@ void DeepLProvider::onReplyFinished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
+    const bool current = reply->property("requestId").toULongLong() == m_requestId;
+    if (!current) {
+        reply->deleteLater();
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         emit translationError(QString("DeepL 错误: %1").arg(reply->errorString()));

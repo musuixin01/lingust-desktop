@@ -6,6 +6,7 @@
 #include <QFocusEvent>
 #include <QGuiApplication>
 #include <QHoverEvent>
+#include <QInputMethod>
 #include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -20,13 +21,39 @@
 #include <QWheelEvent>
 #include <cmath>
 
+namespace {
+class TranslatorRenderControl final : public QQuickRenderControl
+{
+public:
+    explicit TranslatorRenderControl(QWindow *host)
+        : m_host(host)
+    {
+    }
+
+    QWindow *renderWindow(QPoint *offset) override
+    {
+        if (offset) *offset = QPoint();
+        return m_host;
+    }
+
+private:
+    QPointer<QWindow> m_host;
+};
+}
+
 TranslatorWindow::TranslatorWindow(QWindow *parent)
     : QWindow(parent)
-    , m_renderControl(std::make_unique<QQuickRenderControl>())
+    , m_renderControl(std::make_unique<TranslatorRenderControl>(this))
     , m_scene(std::make_unique<QQuickWindow>(m_renderControl.get()))
     , m_sizeAnimation(new QVariantAnimation(this))
 {
     m_scene->setColor(Qt::transparent);
+    connect(m_scene.get(), &QQuickWindow::focusObjectChanged,
+            this, [this](QObject *object) {
+        emit focusObjectChanged(object);
+        if (isActive() && QGuiApplication::inputMethod())
+            QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
+    });
     connect(m_renderControl.get(), &QQuickRenderControl::renderRequested,
             this, &TranslatorWindow::scheduleRender);
     connect(m_renderControl.get(), &QQuickRenderControl::sceneChanged,
@@ -38,9 +65,16 @@ TranslatorWindow::TranslatorWindow(QWindow *parent)
         QRect target = m_animationOrigin;
         target.setSize(QSize(qRound(logicalSize.width() * scale),
                              qRound(logicalSize.height() * scale)));
+        target.moveLeft(qRound(m_animationOrigin.center().x() - target.width() / 2.0));
         renderAndPresent(target);
     });
     setupWindow();
+}
+
+QObject *TranslatorWindow::focusObject() const
+{
+    return m_scene && m_scene->focusObject() ? m_scene->focusObject()
+                                              : QWindow::focusObject();
 }
 
 TranslatorWindow::~TranslatorWindow()
@@ -134,24 +168,44 @@ void TranslatorWindow::setContentItem(QQuickItem *item)
     if (!item) return;
     m_rootItem = item;
     item->setParentItem(m_scene->contentItem());
+    // QQuickRenderControl has no native focus window. Establish the initial
+    // focus scope so pointer-selected TextFields can become the active item.
+    item->forceActiveFocus(Qt::OtherFocusReason);
     scheduleRender();
 }
 
 void TranslatorWindow::scheduleRender()
 {
-    if (m_renderQueued || !m_resizeSession || !m_rootItem) return;
+    if (m_minimized || windowState() == Qt::WindowMinimized
+        || m_renderQueued || !m_resizeSession || !m_rootItem) return;
     m_renderQueued = true;
     QTimer::singleShot(0, this, [this] {
         m_renderQueued = false;
-        if (!m_rendering && m_resizeSession)
+        if (!m_minimized && windowState() != Qt::WindowMinimized
+            && !m_rendering && m_resizeSession)
             renderAndPresent(m_resizeSession->nativeGeometry(this));
     });
 }
 
+void TranslatorWindow::requestSurfaceFrame()
+{
+    scheduleRender();
+}
+
+void TranslatorWindow::refreshNativeSession()
+{
+    if (m_resizeSession) m_resizeSession->initialize(this);
+}
+
 bool TranslatorWindow::renderAndPresent(const QRect &nativeGeometry)
 {
-    if (m_rendering || !m_resizeSession || !m_rootItem || !nativeGeometry.isValid()) return false;
+    if (m_minimized || windowState() == Qt::WindowMinimized
+        || m_rendering || !m_resizeSession || !m_rootItem || !nativeGeometry.isValid()) return false;
     m_rendering = true;
+    if (m_nativeFrameGeometry != nativeGeometry) {
+        m_nativeFrameGeometry = nativeGeometry;
+        emit nativeFrameGeometryChanged();
+    }
     const qreal scale = qMax<qreal>(1.0, m_resizeSession->scaleFactor(this));
     // QWindow geometry is integral, but QML bounds must retain the fractional
     // logical size so their right/bottom edges land on the exact physical pixel.
@@ -179,8 +233,14 @@ bool TranslatorWindow::renderAndPresent(const QRect &nativeGeometry)
 
     WindowSurface surface;
     surface.pill = m_currentMode == "pill";
+    surface.cornerRadius = qMin(nativeGeometry.height() / 2, qRound(32 * scale));
     surface.color = m_rootItem->property("shellColor").value<QColor>();
     surface.opacity = m_rootItem->property("shellOpacity").toReal();
+    surface.auroraOpacity = m_rootItem->property("auroraOpacity").toReal();
+    surface.auroraBloom = m_rootItem->property("auroraBloom").toReal();
+    surface.auroraPhase = m_rootItem->property("auroraPhase").toReal();
+    surface.resizeEdges = int(m_resizeHoverEdges);
+    surface.resizing = m_isResizing;
     m_presenting = true;
     const bool result = m_resizeSession->present(this, m_frame, nativeGeometry, surface);
     m_presenting = false;
@@ -214,10 +274,24 @@ void TranslatorWindow::applyInteractiveResize()
 void TranslatorWindow::endInteractiveResize()
 {
     if (!m_isResizing) return;
+    QRect finalGeometry;
     if (m_resizeSession) {
-        const QRect finalGeometry = m_resizeSession->targetGeometry(this);
+        finalGeometry = m_resizeSession->targetGeometry(this);
         if (finalGeometry.isValid() && finalGeometry != m_resizeSession->nativeGeometry(this))
             renderAndPresent(finalGeometry);
+        if (!finalGeometry.isValid()) finalGeometry = m_resizeSession->nativeGeometry(this);
+        if (finalGeometry.isValid()) {
+            const qreal scale = m_resizeSession->scaleFactor(this);
+            const int logicalWidth = qRound(finalGeometry.width() / scale);
+            const int logicalHeight = qRound(finalGeometry.height() / scale);
+            if (m_currentMode == "pill") {
+                setPillWidth(logicalWidth);
+                setPillHeight(logicalHeight);
+            } else {
+                setCardWidth(logicalWidth);
+                setCardHeight(logicalHeight);
+            }
+        }
     }
     m_resizeEdges = {};
     m_isResizing = false;
@@ -247,32 +321,68 @@ void TranslatorWindow::toggleMode()
 
 void TranslatorWindow::expandToCard()
 {
-    const int targetWidth = qMax(width(), 380);
+    if (m_currentMode == "card" && m_sizeAnimation->state() != QAbstractAnimation::Running) return;
+    const int targetWidth = qMax(m_cardWidth, DefaultCardWidth);
     m_cardWidth = targetWidth;
-    m_cardHeight = 490;
+    // Opening without a result starts as the compact reference card. The QML
+    // content measurement grows it after rich translation data is rendered.
+    m_cardHeight = DefaultCardHeight;
     setCurrentMode("card");
-    animateSize(targetWidth, m_cardHeight, 220);
+    animateSize(targetWidth, m_cardHeight, 200);
 }
 
 void TranslatorWindow::collapseToPill()
 {
-    const int targetWidth = qMax(width(), 160);
-    m_pillWidth = targetWidth;
-    m_pillHeight = 46;
+    if (m_currentMode == "pill" && m_sizeAnimation->state() != QAbstractAnimation::Running) return;
+    const int targetWidth = qMax(m_pillWidth, 160);
+    const int targetHeight = qBound(38, m_pillHeight, 72);
     setCurrentMode("pill");
-    animateSize(targetWidth, m_pillHeight, 180);
+    animateSize(targetWidth, targetHeight, 165);
 }
 
 void TranslatorWindow::minimizeToTaskbar()
 {
-    showMinimized();
+    if (m_minimized || windowState() == Qt::WindowMinimized) return;
+    m_sizeAnimation->stop();
+    endInteractiveResize();
+    m_minimized = true;
+    m_renderQueued = false;
+    m_resizeHoverEdges = {};
+    unsetCursor();
+    emit resizeHoverEdgesChanged();
+    if (!m_resizeSession || !m_resizeSession->minimize(this))
+        setWindowState(Qt::WindowMinimized);
 }
 
-void TranslatorWindow::adjustHeightToContent(int contentHeight)
+void TranslatorWindow::restoreFromTaskbar()
 {
-    if (m_currentMode != "card" || m_isResizing || contentHeight <= 0) return;
-    const int targetHeight = qBound(200, contentHeight, 800);
-    if (qAbs(height() - targetHeight) >= 10) animateSize(width(), targetHeight, 180);
+    m_minimized = false;
+    setWindowState(Qt::WindowNoState);
+    showNormal();
+    raise();
+    requestActivate();
+    scheduleRender();
+}
+
+void TranslatorWindow::resetCardToDefault()
+{
+    setCardWidth(DefaultCardWidth);
+    setCardHeight(DefaultCardHeight);
+    if (m_currentMode == "card")
+        animateSize(DefaultCardWidth, DefaultCardHeight, 180);
+}
+
+void TranslatorWindow::adjustSizeToContent(int contentWidth, int contentHeight)
+{
+    if (m_currentMode != "card" || m_isResizing || contentWidth <= 0 || contentHeight <= 0) return;
+    const int targetWidth = qBound(DefaultCardWidth, contentWidth, 350);
+    const int targetHeight = qBound(DefaultCardHeight, contentHeight, 500);
+    const int currentWidth = width();
+    const int currentHeight = height();
+    setCardWidth(targetWidth);
+    setCardHeight(targetHeight);
+    if (qAbs(currentWidth - targetWidth) >= 6 || qAbs(currentHeight - targetHeight) >= 6)
+        animateSize(targetWidth, targetHeight, 180);
 }
 
 bool TranslatorWindow::forwardInputEvent(QEvent *event)
@@ -299,6 +409,8 @@ bool TranslatorWindow::forwardInputEvent(QEvent *event)
         }
         if (source->type() == QEvent::MouseMove) updateResizeCursor(source->position());
         const QPointF local = m_resizeSession ? m_resizeSession->pointerPosition(this) : source->position();
+        if (source->type() == QEvent::MouseButtonPress && source->button() == Qt::LeftButton)
+            prepareKeyboardFocus(local);
         QMouseEvent forwarded(source->type(), local, local,
                               source->globalPosition(), source->button(), source->buttons(),
                               source->modifiers(), source->pointingDevice());
@@ -368,21 +480,70 @@ void TranslatorWindow::forwardNativePointer(QEvent::Type type, const QPointF &lo
                                             Qt::MouseButton button, Qt::MouseButtons buttons)
 {
     if (!m_scene || m_isResizing) return;
+    if (type == QEvent::Leave) {
+        if (m_resizeHoverEdges) {
+            m_resizeHoverEdges = {};
+            unsetCursor();
+            emit resizeHoverEdgesChanged();
+            scheduleRender();
+        }
+        if (m_rootItem)
+            QMetaObject::invokeMethod(m_rootItem, "handlePointerLeave", Qt::DirectConnection);
+        QMouseEvent outsideMove(QEvent::MouseMove, QPointF(-10000, -10000),
+                                QPointF(-10000, -10000), QCursor::pos(),
+                                Qt::NoButton, Qt::NoButton, QGuiApplication::keyboardModifiers());
+        QCoreApplication::sendEvent(m_scene.get(), &outsideMove);
+        QEvent leaveEvent(QEvent::Leave);
+        QCoreApplication::sendEvent(m_scene.get(), &leaveEvent);
+        return;
+    }
+    if (type == QEvent::MouseMove)
+        updateResizeCursor(local);
+    if (type == QEvent::MouseButtonPress && button == Qt::LeftButton)
+        prepareKeyboardFocus(local);
     const QPointF global = QCursor::pos();
     QMouseEvent forwarded(type, local, local, global, button, buttons,
                           QGuiApplication::keyboardModifiers());
     QCoreApplication::sendEvent(m_scene.get(), &forwarded);
+    // QML hover handlers may update while the offscreen scene receives the
+    // synthetic move. Apply the native position last so edge reveal state is
+    // deterministic for the visible layered window.
+    if (type == QEvent::MouseMove && m_rootItem)
+        QMetaObject::invokeMethod(m_rootItem, "handlePointerMove", Qt::DirectConnection,
+                                  Q_ARG(QVariant, local.x()), Q_ARG(QVariant, local.y()));
+}
+
+void TranslatorWindow::prepareKeyboardFocus(const QPointF &local)
+{
+    if (!m_rootItem) return;
+    // The visible host owns the native focus while the QML scene is rendered
+    // offscreen. Re-assert activation on the first content click so key and IME
+    // events can be forwarded to the TextField selected below.
+    requestActivate();
+    QMetaObject::invokeMethod(m_rootItem, "prepareKeyboardFocus", Qt::DirectConnection,
+                              Q_ARG(QVariant, local.x()), Q_ARG(QVariant, local.y()));
+    // The platform input context queries QGuiApplication::focusObject(). The
+    // visible layered host now exposes the offscreen scene's focused TextInput;
+    // refresh all query values so IME preedit text and its candidate window use
+    // the correct editor and cursor rectangle immediately after the click.
+    if (QGuiApplication::inputMethod())
+        QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
 }
 
 Qt::Edges TranslatorWindow::resizeEdgesAt(const QPointF &position)
 {
     Q_UNUSED(position)
-    return m_currentMode == "card" && m_resizeSession ? m_resizeSession->hitTest(this) : Qt::Edges{};
+    return m_resizeSession ? m_resizeSession->hitTest(this) : Qt::Edges{};
 }
 
 void TranslatorWindow::updateResizeCursor(const QPointF &position)
 {
     const Qt::Edges edges = resizeEdgesAt(position);
+    if (m_resizeHoverEdges != edges) {
+        m_resizeHoverEdges = edges;
+        emit resizeHoverEdgesChanged();
+        scheduleRender();
+    }
     if (edges == (Qt::LeftEdge | Qt::TopEdge) || edges == (Qt::RightEdge | Qt::BottomEdge))
         setCursor(Qt::SizeFDiagCursor);
     else if (edges == (Qt::RightEdge | Qt::TopEdge) || edges == (Qt::LeftEdge | Qt::BottomEdge))
@@ -397,6 +558,15 @@ void TranslatorWindow::updateResizeCursor(const QPointF &position)
 
 bool TranslatorWindow::event(QEvent *event)
 {
+    if (event->type() == QEvent::WindowStateChange) {
+        const bool isNowMinimized = windowState() == Qt::WindowMinimized;
+        if (!isNowMinimized && m_minimized) {
+            m_minimized = false;
+            scheduleRender();
+        } else if (isNowMinimized) {
+            m_minimized = true;
+        }
+    }
     if (forwardInputEvent(event)) return true;
     return QWindow::event(event);
 }
@@ -404,6 +574,7 @@ bool TranslatorWindow::event(QEvent *event)
 void TranslatorWindow::exposeEvent(QExposeEvent *event)
 {
     QWindow::exposeEvent(event);
+    if (isExposed() && m_resizeSession) m_resizeSession->initialize(this);
     scheduleRender();
 }
 

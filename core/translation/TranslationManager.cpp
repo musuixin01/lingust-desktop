@@ -2,6 +2,7 @@
 #include "../../providers/gemini/GeminiProvider.h"
 #include "../../providers/deepl/DeepLProvider.h"
 #include "../../providers/youdao/YoudaoProvider.h"
+#include "../../providers/fallback/FallbackProvider.h"
 #include <QTimer>
 #include <QDebug>
 
@@ -15,21 +16,26 @@ TranslationManager::TranslationManager(QObject *parent)
     m_providers["gemini"] = new GeminiProvider(this);
     m_providers["deepl"] = new DeepLProvider(this);
     m_providers["youdao"] = new YoudaoProvider(this);
+    m_providers["fallback"] = new FallbackProvider(this);
 
-    // 默认降级顺序：gemini -> deepl -> youdao -> offline
-    m_fallbackEngines = {"deepl", "youdao", "offline"};
+    // 无密钥或服务不可用时，使用免密翻译与词典服务提供可用结果。
+    m_fallbackEngines = {"deepl", "youdao", "fallback"};
 
     for (auto *provider : m_providers) {
         connect(provider, &ITranslationProvider::translationReady,
-                this, &TranslationManager::translationReady);
+                this, [this, provider](const QVariantMap &result) {
+            if (provider == m_activeProvider) emit translationReady(result);
+        });
         connect(provider, &ITranslationProvider::translationError,
-                this, [this](const QString &error) {
+                this, [this, provider](const QString &error) {
+            if (provider != m_activeProvider) return;
+            const QString failedEngine = provider->name();
             ErrorType type = classifyError(error);
 
             // API Key 错误不重试，直接降级
             if (type == ApiKeyError) {
-                qWarning() << "API Key error for" << m_currentEngine << ", falling back";
-                emit engineFallback(m_currentEngine, "next", error);
+                qWarning() << "API Key error for" << failedEngine << ", falling back";
+                emit engineFallback(failedEngine, "next", error);
                 tryNextEngine();
                 return;
             }
@@ -38,15 +44,19 @@ TranslationManager::TranslationManager(QObject *parent)
             if ((type == NetworkError || type == ServiceUnavailable || type == UnknownError)
                 && m_retryCount < m_maxRetries) {
                 m_retryCount++;
-                qWarning() << "Error for" << m_currentEngine << ", retry" << m_retryCount
+                const quint64 requestId = m_requestId;
+                qWarning() << "Error for" << failedEngine << ", retry" << m_retryCount
                            << "/" << m_maxRetries << ":" << error;
-                QTimer::singleShot(500 * m_retryCount, this, &TranslationManager::retryCurrentEngine);
+                QTimer::singleShot(500 * m_retryCount, this,
+                                   [this, requestId, provider] {
+                    retryActiveProvider(requestId, provider);
+                });
                 return;
             }
 
             // 重试耗尽，尝试降级
-            qWarning() << "Retries exhausted for" << m_currentEngine << ", falling back";
-            emit engineFallback(m_currentEngine, "next", error);
+            qWarning() << "Retries exhausted for" << failedEngine << ", falling back";
+            emit engineFallback(failedEngine, "next", error);
             tryNextEngine();
         });
     }
@@ -80,6 +90,8 @@ ITranslationProvider* TranslationManager::getProvider(const QString &engine)
 
 void TranslationManager::translate(const QString &text, const QString &sourceLang, const QString &targetLang)
 {
+    ++m_requestId;
+    m_activeProvider = nullptr;
     m_pendingText = text;
     m_pendingSourceLang = sourceLang;
     m_pendingTargetLang = targetLang;
@@ -103,15 +115,15 @@ void TranslationManager::translate(const QString &text, const QString &sourceLan
         return;
     }
 
+    m_activeProvider = provider;
     provider->translate(text, sourceLang, targetLang);
 }
 
-void TranslationManager::retryCurrentEngine()
+void TranslationManager::retryActiveProvider(quint64 requestId,
+                                             ITranslationProvider *provider)
 {
-    ITranslationProvider *provider = getProvider(m_currentEngine);
-    if (provider) {
-        provider->translate(m_pendingText, m_pendingSourceLang, m_pendingTargetLang);
-    }
+    if (requestId != m_requestId || !provider || provider != m_activeProvider) return;
+    provider->translate(m_pendingText, m_pendingSourceLang, m_pendingTargetLang);
 }
 
 void TranslationManager::tryNextEngine()
@@ -124,20 +136,11 @@ void TranslationManager::tryNextEngine()
         if (m_triedEngines.contains(nextEngine)) continue;
         m_triedEngines.append(nextEngine);
 
-        if (nextEngine == "offline") {
-            qWarning() << "Falling back to offline mode";
-            QVariantMap result;
-            result["translatedText"] = m_pendingText;
-            result["isWord"] = false;
-            result["engine"] = "offline";
-            emit translationReady(result);
-            return;
-        }
-
         ITranslationProvider *provider = getProvider(nextEngine);
         if (provider) {
             qWarning() << "Falling back to" << nextEngine;
             m_retryCount = 0;
+            m_activeProvider = provider;
             provider->translate(m_pendingText, m_pendingSourceLang, m_pendingTargetLang);
             return;
         }

@@ -1,4 +1,4 @@
-"""Visible-window smoke check: card -> actions -> Escape, with cropped evidence."""
+"""Visible-window smoke check: card -> settings -> Escape, with cropped evidence."""
 import argparse
 import ctypes as c
 from ctypes import wintypes as w
@@ -23,6 +23,7 @@ u.SetForegroundWindow.argtypes = [w.HWND]
 u.SetWindowPos.argtypes = [w.HWND,w.HWND,c.c_int,c.c_int,c.c_int,c.c_int,w.UINT]
 u.WindowFromPoint.argtypes = [w.POINT]
 u.WindowFromPoint.restype = w.HWND
+u.ScreenToClient.argtypes = [w.HWND, c.POINTER(w.POINT)]
 callback = c.WINFUNCTYPE(w.BOOL,w.HWND,w.LPARAM)
 
 def windows():
@@ -44,32 +45,65 @@ def rect(hwnd):
     if not u.GetWindowRect(hwnd,c.byref(r)): raise c.WinError()
     return (r.left,r.top,r.right,r.bottom)
 
-main = windows()['Linguist 桌面悬浮翻译']
+def click_client(hwnd, screen_x, screen_y):
+    point = w.POINT(screen_x, screen_y)
+    if not u.ScreenToClient(hwnd, c.byref(point)): raise c.WinError()
+    packed = (point.y << 16) | (point.x & 0xffff)
+    u.SendMessageW(hwnd, 0x0201, 0x0001, packed)
+    time.sleep(.04)
+    u.SendMessageW(hwnd, 0x0202, 0, packed)
+
+def save_crop(hwnd, name):
+    try:
+        ImageGrab.grab(bbox=rect(hwnd)).save(a.output/name)
+        return True
+    except OSError as error:
+        print(f'WARN: desktop capture unavailable ({error}); interaction checks continue')
+        return False
+
+main = None
+for _ in range(30):
+    main = windows().get('Linguist 桌面悬浮翻译')
+    if main:
+        break
+    time.sleep(.1)
+if not main:
+    raise RuntimeError('Translator window did not become ready')
 u.SetWindowPos(main,w.HWND(-1),0,0,0,0,0x0003)
 u.SetForegroundWindow(main)
 time.sleep(.3)
 r = rect(main)
 scale = u.GetDpiForWindow(main) / 96
 if r[3]-r[1] < 100*scale:
-    raise RuntimeError('Run after the resize probe has expanded the card')
-ImageGrab.grab(bbox=r).save(a.output/'card.png')
+    expand_x = r[2] - round(18*scale)
+    expand_y = (r[1] + r[3]) // 2
+    if u.WindowFromPoint(w.POINT(expand_x,expand_y)) != main:
+        raise RuntimeError('Card expand action is occluded')
+    u.SetCursorPos(expand_x,expand_y)
+    click_client(main, expand_x, expand_y)
+    time.sleep(.45)
+    r = rect(main)
+if r[3]-r[1] < 100*scale:
+    raise RuntimeError('Card did not expand from pill mode')
+save_crop(main, 'card.png')
 x = r[2]-round(32*scale)
 y = r[1]+round(24*scale)
 u.SetCursorPos(x,y)
 time.sleep(.15)
 if u.WindowFromPoint(w.POINT(x,y)) != main:
     raise RuntimeError('Card action is occluded; refusing to click another app')
-u.mouse_event(2,0,0,0,0)
-time.sleep(.05)
-u.mouse_event(4,0,0,0,0)
+click_client(main, x, y)
 time.sleep(.7)
-actions = windows().get('快捷操作')
-if not actions: raise RuntimeError('More action did not open its independent window')
-ImageGrab.grab(bbox=rect(actions)).save(a.output/'actions.png')
-u.SetForegroundWindow(actions)
+settings = next((hwnd for title, hwnd in windows().items()
+                 if title == 'Linguist 设置' or title.startswith('Linguist 设置 - ')), None)
+if not settings: raise RuntimeError('Settings action did not open its independent window')
+save_crop(settings, 'settings.png')
+u.SetForegroundWindow(settings)
 time.sleep(.1)
-u.keybd_event(0x1B,0,0,0)
-u.keybd_event(0x1B,0,2,0)
+u.SendMessageW(settings, 0x0100, 0x1B, 0)
+u.SendMessageW(settings, 0x0101, 0x1B, 0)
 time.sleep(.3)
-if '快捷操作' in windows(): raise RuntimeError('Escape did not close the actions window')
-print('PASS: visible card, independent actions window, Escape close')
+if any(title == 'Linguist 设置' or title.startswith('Linguist 设置 - ')
+       for title in windows()):
+    raise RuntimeError('Escape did not close the settings window')
+print('PASS: visible card, independent settings window, animated Escape close')

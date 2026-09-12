@@ -16,10 +16,17 @@ Item {
     Rectangle {
         id: surface
         anchors.fill: parent
-        radius: 24
-        color: Qt.rgba(0.04, 0.06, 0.12, 0.88)
+        radius: DesignTokens.radiusWindow
+        color: DesignTokens.windowSurface
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.18)
+        border.color: DesignTokens.borderNormal
+
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            height: 48
+            radius: surface.radius
+            color: DesignTokens.windowHeader
+        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -57,7 +64,9 @@ Item {
                         font.weight: Font.DemiBold
                     }
                     Text {
-                        text: appState ? (appState.musicPlaying ? "正在播放 · Windows GSMTC 监听" : "已暂停") : "就绪"
+                        text: appState && appState.systemMediaConnected
+                              ? (appState.musicPlaying ? "正在播放 · Windows 系统媒体" : "已暂停 · Windows 系统媒体")
+                              : "未检测到系统媒体"
                         color: Qt.rgba(1, 1, 1, 0.5)
                         font.pixelSize: 10
                     }
@@ -93,16 +102,20 @@ Item {
                     height: 54
                     radius: 27
                     color: "#0f172a"
-                    border.width: 2
-                    border.color: Qt.rgba(0.06, 0.78, 0.55, 0.5)
+                    clip: true
 
                     Image {
                         id: vinylDisc
+                        objectName: "musicCardAlbumDisc"
                         anchors.fill: parent
-                        anchors.margins: 4
-                        source: "qrc:/qt/qml/Linguist/resources/icons/disc.svg"
+                        source: appState && appState.coverArtUrl ? appState.coverArtUrl
+                                                                : "qrc:/qt/qml/Linguist/resources/icons/disc.svg"
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize.width: 128
+                        sourceSize.height: 128
 
                         RotationAnimator {
+                            objectName: "musicCardDiscRotation"
                             target: vinylDisc
                             from: 0
                             to: 360
@@ -114,12 +127,41 @@ Item {
 
                     Rectangle {
                         anchors.centerIn: parent
-                        width: 14
-                        height: 14
-                        radius: 7
-                        color: "#10b981"
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: "#0a0f1e"
                         border.color: "white"
-                        border.width: 1.5
+                        border.width: 1
+                    }
+                }
+
+                Canvas {
+                    objectName: "musicCardProgressRing"
+                    Layout.preferredWidth: 58
+                    Layout.preferredHeight: 58
+                    Layout.leftMargin: -70
+                    Layout.rightMargin: 12
+                    readonly property real progress: appState && appState.trackDuration > 0
+                                                     ? Math.max(0, Math.min(1, appState.trackPosition / appState.trackDuration))
+                                                     : 0
+                    onProgressChanged: requestPaint()
+                    onPaint: {
+                        var context = getContext("2d")
+                        context.clearRect(0, 0, width, height)
+                        context.lineWidth = 2
+                        context.strokeStyle = Qt.rgba(1, 1, 1, 0.14)
+                        context.beginPath()
+                        context.arc(width / 2, height / 2, width / 2 - 2, 0, Math.PI * 2)
+                        context.stroke()
+                        if (progress > 0) {
+                            context.strokeStyle = "#34d399"
+                            context.lineCap = "round"
+                            context.beginPath()
+                            context.arc(width / 2, height / 2, width / 2 - 2,
+                                        -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress)
+                            context.stroke()
+                        }
                     }
                 }
 
@@ -138,7 +180,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: appState && appState.trackArtist ? appState.trackArtist : "Windows 系统音频媒体总线"
+                        text: appState && appState.trackArtist ? appState.trackArtist : "请先在音乐应用或浏览器中播放音频"
                         color: Qt.rgba(1, 1, 1, 0.6)
                         font.pixelSize: 11
                         elide: Text.ElideRight
@@ -155,37 +197,61 @@ Item {
                 }
             }
 
-            // Dynamic Lyric Box (双语实时歌词)
+            // 多行歌词：同步歌词跟随当前时间，滚轮/触控板可自由浏览。
             Rectangle {
+                id: lyricPanel
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 76
                 radius: 12
                 color: Qt.rgba(0, 0, 0, 0.3)
                 border.color: Qt.rgba(1, 1, 1, 0.08)
 
-                ColumnLayout {
+                ListView {
+                    id: lyricsList
+                    objectName: "musicLyricsList"
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    clip: true
+                    spacing: 3
+                    model: appState ? appState.musicLyrics : []
+                    currentIndex: appState ? appState.currentLyricIndex : -1
+                    boundsBehavior: Flickable.StopAtBounds
+                    highlightMoveDuration: 220
+                    highlightMoveVelocity: -1
+                    onCurrentIndexChanged: {
+                        if (currentIndex >= 0 && !moving && !dragging)
+                            positionViewAtIndex(currentIndex, ListView.Center)
+                    }
+
+                    delegate: Text {
+                        required property var modelData
+                        required property int index
+                        width: lyricsList.width - 8
+                        text: modelData.text
+                        color: index === lyricsList.currentIndex ? "#a7f3d0" : Qt.rgba(1, 1, 1, 0.52)
+                        font.pixelSize: index === lyricsList.currentIndex ? 12 : 11
+                        font.weight: index === lyricsList.currentIndex ? Font.DemiBold : Font.Normal
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        lineHeight: 1.35
+                        Behavior on color { ColorAnimation { duration: 160 } }
+                    }
+
+                    ScrollBar.vertical: ScrollBar {
+                        policy: lyricsList.contentHeight > lyricsList.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                    }
+                }
+
+                Text {
                     anchors.centerIn: parent
-                    width: parent.width - 24
-                    spacing: 4
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: appState && appState.currentLyric ? appState.currentLyric : "♪ 随心所听，专注工作与学习 ♪"
-                        color: "#a7f3d0"
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: appState && appState.currentLyricTranslation ? appState.currentLyricTranslation : "Listening at ease, stay in flow"
-                        color: Qt.rgba(1, 1, 1, 0.55)
-                        font.pixelSize: 11
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
-                    }
+                    width: parent.width - 28
+                    visible: !appState || appState.musicLyrics.length === 0
+                    text: appState && appState.systemMediaConnected ? "正在查找歌词…" : "等待系统媒体会话"
+                    color: Qt.rgba(1, 1, 1, 0.48)
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                 }
             }
 
@@ -198,8 +264,9 @@ Item {
                     id: progressSlider
                     Layout.fillWidth: true
                     from: 0
-                    to: appState && appState.trackDuration > 0 ? appState.trackDuration : 180
+                    to: appState && appState.trackDuration > 0 ? appState.trackDuration : 1
                     value: appState ? appState.trackPosition : 0
+                    enabled: appState && appState.trackDuration > 0
                     onMoved: {
                         if (appState) {
                             appState.seekTrack(Math.floor(value));
@@ -222,7 +289,8 @@ Item {
                     Item { Layout.fillWidth: true }
                     Text {
                         text: {
-                            var d = appState ? appState.trackDuration : 180;
+                            var d = appState ? appState.trackDuration : 0;
+                            if (d <= 0) return "--:--";
                             var m = Math.floor(d / 60);
                             var s = d % 60;
                             return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
@@ -239,6 +307,7 @@ Item {
                 spacing: 20
 
                 IconButton {
+                    enabled: appState && appState.systemMediaConnected
                     iconSource: "qrc:/qt/qml/Linguist/resources/icons/skip-back.svg"
                     width: 32; height: 32
                     iconSize: 16
@@ -251,6 +320,7 @@ Item {
                     height: 44
                     radius: 22
                     color: "#10b981"
+                    opacity: appState && appState.systemMediaConnected ? 1 : 0.38
 
                     Image {
                         anchors.centerIn: parent
@@ -263,12 +333,14 @@ Item {
 
                     MouseArea {
                         anchors.fill: parent
+                        enabled: appState && appState.systemMediaConnected
                         cursorShape: Qt.PointingHandCursor
                         onClicked: if (appState) appState.toggleMusicPlay()
                     }
                 }
 
                 IconButton {
+                    enabled: appState && appState.systemMediaConnected
                     iconSource: "qrc:/qt/qml/Linguist/resources/icons/skip-forward.svg"
                     width: 32; height: 32
                     iconSize: 16

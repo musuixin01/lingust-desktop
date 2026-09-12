@@ -12,7 +12,7 @@ public:
     virtual ~IOcrProvider() = default;
 
     virtual QString name() const = 0;
-    virtual void recognize(const QImage &image) = 0;
+    virtual void recognize(const QImage &image, const QString &language = QString()) = 0;
 
 signals:
     void recognitionReady(const QString &text);

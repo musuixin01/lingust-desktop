@@ -109,8 +109,22 @@ for path, w, h, maskable in icons:
         f.write(data)
     print(f"Generated {path} ({w}x{h})")
 
-# Copy 32x32 to favicon.ico
+def create_ico_bytes(sizes):
+    images = [create_png_bytes(size, size, False) for size in sizes]
+    header_size = 6 + len(images) * 16
+    entries = []
+    offset = header_size
+    for size, data in zip(sizes, images):
+        dimension = 0 if size == 256 else size
+        entries.append(struct.pack("<BBBBHHII", dimension, dimension, 0, 0,
+                                   1, 32, len(data), offset))
+        offset += len(data)
+    return struct.pack("<HHH", 0, 1, len(images)) + b"".join(entries) + b"".join(images)
+
+# Windows and browsers require a real ICO directory, not a PNG with an .ico suffix.
+ico = create_ico_bytes([16, 32, 48, 64, 128, 256])
 with open("public/favicon.ico", "wb") as f:
-    with open("public/favicon-32x32.png", "rb") as src:
-        f.write(src.read())
-print("Generated public/favicon.ico")
+    f.write(ico)
+with open("resources/app.ico", "wb") as f:
+    f.write(ico)
+print("Generated public/favicon.ico and resources/app.ico")

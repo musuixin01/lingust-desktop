@@ -15,6 +15,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Network
     Sql
     Widgets
+    Concurrent
 )
 
 qt_standard_project_setup(REQUIRES 6.8)
@@ -42,6 +43,8 @@ set(SOURCES
     providers/deepl/DeepLProvider.h
     providers/youdao/YoudaoProvider.cpp
     providers/youdao/YoudaoProvider.h
+    providers/fallback/FallbackProvider.cpp
+    providers/fallback/FallbackProvider.h
     infrastructure/database/DatabaseManager.cpp
     infrastructure/database/DatabaseManager.h
     infrastructure/crash/CrashHandler.cpp
@@ -58,7 +61,12 @@ set(SOURCES
     core/ocr/OcrManager.h
     core/media/MediaSessionService.cpp
     core/media/MediaSessionService.h
+    providers/lyrics/ILyricsProvider.h
+    providers/lyrics/LrclibLyricsProvider.cpp
+    providers/lyrics/LrclibLyricsProvider.h
     providers/ocr/IOcrProvider.h
+    platform/windows/ocr/WindowsOcrProvider.cpp
+    platform/windows/ocr/WindowsOcrProvider.h
     platform/windows/hotkey/HotkeyManager.cpp
     platform/windows/hotkey/HotkeyManager.h
     platform/windows/mousehook/MouseHookManager.cpp
@@ -69,12 +77,27 @@ set(SOURCES
 
 qt_add_executable(lingust ${SOURCES})
 
+add_custom_command(TARGET lingust POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/windows/media/SystemMediaBridge.ps1"
+        "$<TARGET_FILE_DIR:lingust>/SystemMediaBridge.ps1"
+    COMMENT "Copying Windows system media bridge"
+)
+
+add_custom_command(TARGET lingust POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/platform/windows/ocr/SystemOcrBridge.ps1"
+        "$<TARGET_FILE_DIR:lingust>/SystemOcrBridge.ps1"
+    COMMENT "Copying Windows OCR bridge"
+)
+
 qt_add_qml_module(lingust
     URI Linguist
     VERSION 1.0
     QML_FILES
         ui/Main.qml
         ui/components/GlassSurface.qml
+        ui/components/AuroraBorder.qml
         ui/components/TrafficLights.qml
         ui/components/HoverScrollText.qml
         ui/components/MarqueeText.qml
@@ -85,8 +108,11 @@ qt_add_qml_module(lingust
         ui/card/CardView.qml
         ui/card/WordDetailView.qml
         ui/card/SearchInput.qml
+        ui/card/LayoutScalePanel.qml
         ui/card/HistoryView.qml
         ui/card/ScreenshotTranslationView.qml
+        ui/card/ScreenshotPreview.qml
+        ui/overlay/ScreenCaptureOverlay.qml
         ui/settings/SettingsView.qml
     RESOURCES
         ui/components/DesignTokens.qml
@@ -129,10 +155,13 @@ target_link_libraries(lingust PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::Widgets
+    Qt6::Concurrent
 )
 
 if(WIN32)
-    target_sources(lingust PRIVATE platform/windows/window/WindowsResizeSession.cpp)
+    target_sources(lingust PRIVATE
+        platform/windows/window/WindowsResizeSession.cpp
+    )
     target_link_libraries(lingust PRIVATE dwmapi gdiplus)
     target_compile_definitions(lingust PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 
@@ -146,9 +175,27 @@ endif()
 
 # 输出目录
 set_target_properties(lingust PROPERTIES
-    WIN32_EXECUTABLE FALSE
+    WIN32_EXECUTABLE TRUE
     MACOSX_BUNDLE TRUE
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    qt_add_executable(lingust_input_method_test
+        tests/input_method_smoke.cpp
+        core/window/TranslatorWindow.cpp
+        core/window/TranslatorWindow.h
+        core/window/WindowResizeSession.h
+    )
+    set_target_properties(lingust_input_method_test PROPERTIES WIN32_EXECUTABLE FALSE)
+    target_include_directories(lingust_input_method_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(lingust_input_method_test PRIVATE
+        Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick
+    )
+    add_test(NAME input_method_smoke
+        COMMAND lingust_input_method_test -platform offscreen
+    )
+endif()

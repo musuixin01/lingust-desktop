@@ -3,6 +3,7 @@ build/
 build-*/
 cmake-build-*/
 out/
+artifacts/
 
 # Large data files (offline dictionary 800MB+)
 data/

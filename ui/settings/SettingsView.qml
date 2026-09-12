@@ -7,11 +7,18 @@ Rectangle {
     id: settingsView
     width: 440
     height: 580
-    radius: 20
-    color: "#f5121524"
+    radius: DesignTokens.radiusWindow
+    color: DesignTokens.windowSurface
     border.color: DesignTokens.borderNormal
     border.width: 1
     clip: true
+
+    Rectangle {
+        anchors { left: parent.left; right: parent.right; top: parent.top }
+        height: 54
+        radius: settingsView.radius
+        color: DesignTokens.windowHeader
+    }
 
     signal closeRequested()
 
@@ -343,7 +350,7 @@ Rectangle {
                                     echoMode: settingsView.showGeminiKey ? TextInput.Normal : TextInput.Password
                                     color: DesignTokens.textPrimary
                                     font.pixelSize: 11
-                                    font.family: "Consolas"
+                                    font.family: DesignTokens.fontMono
                                     background: Rectangle {
                                         radius: 8
                                         color: "#1affffff"
@@ -414,7 +421,7 @@ Rectangle {
                                     echoMode: settingsView.showDeeplKey ? TextInput.Normal : TextInput.Password
                                     color: DesignTokens.textPrimary
                                     font.pixelSize: 11
-                                    font.family: "Consolas"
+                                    font.family: DesignTokens.fontMono
                                     background: Rectangle {
                                         radius: 8
                                         color: "#1affffff"
@@ -506,7 +513,7 @@ Rectangle {
                                     echoMode: settingsView.showYoudaoSecret ? TextInput.Normal : TextInput.Password
                                     color: DesignTokens.textPrimary
                                     font.pixelSize: 11
-                                    font.family: "Consolas"
+                                    font.family: DesignTokens.fontMono
                                     background: Rectangle {
                                         radius: 8
                                         color: "#1affffff"
@@ -849,7 +856,7 @@ Rectangle {
                             color: "#93c5fd"
                             font.pixelSize: 11
                             font.bold: true
-                            font.family: "Consolas"
+                            font.family: DesignTokens.fontMono
                         }
                     }
 
@@ -875,7 +882,7 @@ Rectangle {
                             color: "#93c5fd"
                             font.pixelSize: 11
                             font.bold: true
-                            font.family: "Consolas"
+                            font.family: DesignTokens.fontMono
                         }
                     }
 

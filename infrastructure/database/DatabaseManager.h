@@ -17,7 +17,8 @@ public:
     // 历史记录
     Q_INVOKABLE void addHistory(const QString &sourceText, const QString &translatedText,
                                 const QString &sourceLang, const QString &targetLang,
-                                const QString &engine);
+                                const QString &engine, const QString &kind = "text",
+                                const QString &previewUrl = {});
     Q_INVOKABLE QVariantList getHistory(int limit = 50);
     Q_INVOKABLE void clearHistory();
     Q_INVOKABLE void deleteHistory(int id);

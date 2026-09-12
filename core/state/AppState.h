@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 #include <QTimer>
 #include "../translation/TranslationManager.h"
@@ -9,6 +10,7 @@
 #include "../../infrastructure/database/DatabaseManager.h"
 #include "../selection/SelectionManager.h"
 #include "../media/MediaSessionService.h"
+#include "../../providers/lyrics/LrclibLyricsProvider.h"
 
 class AppState : public QObject
 {
@@ -53,7 +55,17 @@ class AppState : public QObject
     Q_PROPERTY(int trackPosition READ trackPosition NOTIFY musicPositionChanged)
     Q_PROPERTY(QString currentLyric READ currentLyric NOTIFY musicLyricChanged)
     Q_PROPERTY(QString currentLyricTranslation READ currentLyricTranslation NOTIFY musicLyricChanged)
+    Q_PROPERTY(QString coverArtUrl READ coverArtUrl NOTIFY musicTrackChanged)
+    Q_PROPERTY(QVariantList musicLyrics READ musicLyrics NOTIFY musicLyricsChanged)
+    Q_PROPERTY(int currentLyricIndex READ currentLyricIndex NOTIFY musicLyricChanged)
+    Q_PROPERTY(bool lyricsSynchronized READ lyricsSynchronized NOTIFY musicLyricsChanged)
+    Q_PROPERTY(bool systemMediaConnected READ systemMediaConnected NOTIFY systemMediaConnectedChanged)
     Q_PROPERTY(bool pillMusicMode READ pillMusicMode WRITE setPillMusicMode NOTIFY pillMusicModeChanged)
+    Q_PROPERTY(QVariantList ocrLines READ ocrLines NOTIFY ocrStateChanged)
+    Q_PROPERTY(QString ocrImagePreview READ ocrImagePreview NOTIFY ocrStateChanged)
+    Q_PROPERTY(bool isOcrProcessing READ isOcrProcessing NOTIFY ocrStateChanged)
+    Q_PROPERTY(QString ocrStatus READ ocrStatus NOTIFY ocrStateChanged)
+    Q_PROPERTY(bool screenshotMode READ screenshotMode NOTIFY ocrStateChanged)
 
 public:
     explicit AppState(QObject *parent = nullptr);
@@ -117,9 +129,18 @@ public:
     Q_INVOKABLE void clearHistory();
     Q_INVOKABLE void deleteHistory(int id);
     Q_INVOKABLE void refreshHistory();
+    Q_INVOKABLE void openHistoryItem(const QVariantMap &item);
     Q_INVOKABLE void refreshFavorites();
     Q_INVOKABLE void triggerSelectionTranslation();
+    Q_INVOKABLE void requestScreenshot();
+    Q_INVOKABLE void exitScreenshotMode();
     Q_INVOKABLE QString completeTranslation() const;
+
+    QVariantList ocrLines() const { return m_ocrLines; }
+    QString ocrImagePreview() const { return m_ocrImagePreview; }
+    bool isOcrProcessing() const { return m_isOcrProcessing; }
+    QString ocrStatus() const { return m_ocrStatus; }
+    bool screenshotMode() const { return m_screenshotMode; }
 
     // 灵动岛音乐与媒体操作
     bool musicPlaying() const;
@@ -130,6 +151,11 @@ public:
     int trackPosition() const;
     QString currentLyric() const;
     QString currentLyricTranslation() const;
+    QString coverArtUrl() const;
+    QVariantList musicLyrics() const;
+    int currentLyricIndex() const;
+    bool lyricsSynchronized() const;
+    bool systemMediaConnected() const;
     bool pillMusicMode() const { return m_pillMusicMode; }
     Q_INVOKABLE void setPillMusicMode(bool enabled);
     Q_INVOKABLE void togglePillMusicMode();
@@ -138,8 +164,19 @@ public:
     Q_INVOKABLE void prevTrack();
     Q_INVOKABLE void seekTrack(int seconds);
 
+public slots:
+    void beginScreenshotTranslation(const QString &previewUrl);
+    void submitOcrText(const QString &text);
+    void setOcrError(const QString &message);
+    void updateSystemMediaSession(bool connected, bool playing,
+                                  const QString &title, const QString &artist,
+                                  const QString &album, const QString &coverDataUrl,
+                                  int durationSeconds,
+                                  int positionSeconds);
+
 signals:
     void sourceTextChanged();
+    void textCleared();
     void translatedTextChanged();
     void sourceLangChanged();
     void targetLangChanged();
@@ -172,16 +209,28 @@ signals:
     void musicTrackChanged();
     void musicPositionChanged();
     void musicLyricChanged();
+    void musicLyricsChanged();
+    void systemMediaConnectedChanged();
     void pillMusicModeChanged();
+    void screenshotRequested();
+    void ocrStateChanged();
+    void musicToggleRequested();
+    void musicNextRequested();
+    void musicPreviousRequested();
+    void musicSeekRequested(int seconds);
 
 private slots:
     void onTranslationReady(const QVariantMap &result);
     void onTranslationError(const QString &error);
+    void onOcrLineTranslationReady(const QVariantMap &result);
+    void onOcrLineTranslationError(const QString &error);
     void resetJustCopied();
     void applyPendingResult();
 
 private:
     void clearResult();
+    void translateNextOcrLine();
+    void finishOcrLineTranslation();
 
     QString m_sourceText;
     QString m_translatedText;
@@ -214,12 +263,24 @@ private:
     QTimer m_copyTimer;
     QTimer m_minLoadTimer;
     qint64 m_translateStartTime;
+    quint64 m_translationRevision = 0;
     QVariantMap m_pendingResult;
     QString m_pendingError;
     TranslationManager *m_translationManager;
+    TranslationManager *m_ocrTranslationManager;
     OfflineDictionary *m_offlineDict;
     DatabaseManager *m_database;
     SelectionManager *m_selectionManager;
     MediaSessionService *m_mediaSession;
+    LrclibLyricsProvider *m_lyricsProvider;
     bool m_pillMusicMode = false;
+    QVariantList m_ocrLines;
+    QString m_ocrImagePreview;
+    QString m_ocrOriginalText;
+    QStringList m_ocrSourceLines;
+    QStringList m_ocrTranslatedLines;
+    QString m_ocrStatus;
+    bool m_isOcrProcessing = false;
+    int m_ocrLineIndex = 0;
+    bool m_screenshotMode = false;
 };

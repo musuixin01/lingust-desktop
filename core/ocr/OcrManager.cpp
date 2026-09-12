@@ -6,13 +6,13 @@ OcrManager::OcrManager(QObject *parent)
 {
 }
 
-void OcrManager::recognize(const QImage &image)
+void OcrManager::recognize(const QImage &image, const QString &language)
 {
     if (!m_provider) {
         emit recognitionError("未配置 OCR 引擎");
         return;
     }
-    m_provider->recognize(image);
+    m_provider->recognize(image, language);
 }
 
 void OcrManager::setProvider(IOcrProvider *provider)

@@ -18,4 +18,5 @@ private slots:
 
 private:
     QNetworkAccessManager *m_network;
+    quint64 m_requestId = 0;
 };

@@ -6,6 +6,215 @@
 
 ## [Unreleased] - 开发中
 
+### 2026-09-12 — 任务栏最小化与药丸边缘悬浮
+
+- [Docs] Windows 发布目录同时携带版本说明与全局验证记录，安装后可直接查看交付范围和验证边界。
+- [Fixed] `WindowsResizeSession.*`：鼠标按下直接使用消息自带的窗口内坐标做八向边框命中，消除全局指针采样延迟把普通按钮误判为缩放的竞态；悬浮光标仍按真实全局位置更新。
+- [Fixed] `TranslatorWindow.*`、`Main.qml`：公开实际原生窗口矩形供外置页面排版面板定位，避免自绘窗口经 `UpdateLayeredWindow` 移动后 Qt 逻辑坐标滞留导致面板漂移。
+- [Fixed] `TranslationManager.*`：降级引擎的失败重试绑定当前实际 Provider，不再回跳并重试最初的首选引擎。
+- [Fixed] `MusicIslandCard.qml`、`tst_toolbar.qml`：唱片旋转回归改为检查动画器运行状态，移除离屏渲染线程取样造成的偶发失败；完整 QML 套件 144 项全部通过。
+- [Docs] `docs/VALIDATION.md`：新增全局功能矩阵、已修复逻辑错误以及需要真实媒体/密钥/桌面环境确认的边界。
+- [Changed] `Main.qml`、`LayoutScalePanel.qml`：页面排版面板改为以卡片水平中心为锚点，固定在底边下方 2px；独立窗口在显示期间以 16ms 节奏校准位置，原生移动和缩放期间持续跟随，切回药丸时自动收起。
+- [Fixed] `TranslatorWindow.*`：离屏 `QQuickRenderControl` 显式返回真实主窗口作为渲染宿主，主窗口同步暴露 QML 当前焦点对象并刷新输入法查询，恢复 Windows 中文输入法的预编辑、候选窗定位和中文提交。
+- [Fixed] `WindowsResizeSession.*`：原生输入处理同时注册 Qt 全局原生事件过滤器，并在窗口显示后重新确认挂接；即使 Qt 在首次显示时替换 HWND 窗口过程，药丸展开、搜索和功能按钮仍能收到真实点击。
+- [Fixed] `AppState.*`、`TranslationManager.*`、`GeminiProvider.*`、`DeepLProvider.*`、`YoudaoProvider.*`：语言选择和交换统一触发重译；相同语言自动形成有效方向；所有异步请求加入当前请求隔离，迟到结果、重试和旧引擎结果不能覆盖新语言；仅在目标为中文时用 ECDICT 补中文词典字段。
+- [Added] `installer/Linguist.iss`、`scripts/package_windows.ps1`、`resources/app.ico`：新增用户级 Windows 安装包、开始菜单/可选桌面快捷方式、完整卸载、Qt 运行库收集、正式快捷方式图标与 SHA-256 输出。
+- [Docs] `README.md`、`docs/RELEASE.md`、`docs/API.md`、`docs/ARCHITECTURE.md`、`docs/DESIGN_SYSTEM.md`、`docs/WINDOW_UI_REBUILD.md`：同步中文输入、语言请求一致性、附着面板、当前 MinGW 构建与安装发布流程。
+- [Changed] `Main.qml`：页面排版工具窗固定贴在主卡片底边下方 2px，主卡片移动或缩放时逐帧重算锚点；关闭工具窗自身的拖动区域，避免面板与所属卡片分离。
+- [Added] `LanguageSelector.qml`、`CardView.qml`、`AppState.cpp`：语言胶囊加入液态玻璃多语言选择列表，源语言支持自动检测，目标语言支持简中、英、日、韩、法、德、西、葡、意、俄、阿、越、泰；选择后对已有文本立即重新翻译。
+- [Fixed] `LanguageSelector.qml`：语言列表收紧为 148px 宽、五行可见高度，并按语言胶囊在窗口中的实时坐标限制到卡片边界内；支持滚轮、触控板和拖动滚动，列表打开期间顶部语言选择保持展开，不再发生左侧文字裁切或状态回缩。
+- [Changed] `LanguageSelector.qml`、`CardView.qml`：顶部语言胶囊统一改为 `AUTO / ZH / EN / JA` 等英文标识；右侧功能按钮从连续裁切淡出改为按 26px 完整槽位显隐，任何被遮挡的按钮都整颗隐藏。
+- [Fixed] `CardView.qml`、`tst_card.qml`：恢复右侧操作区原有 reveal 计算、宽度动画、悬浮展开和逐项吸入逻辑；完整按钮继续显示，仅在单枚图标处于部分裁切阶段时隐藏该图标。
+- [Changed] `CardView.qml`、`tst_card.qml`：空状态提示改为较小的“开始翻译 / 输入文字，或直接划词”，减少大字号口号感并保持静止、居中和低对比层级。
+- [Fixed] `FallbackProvider.cpp`、`YoudaoProvider.cpp`：免密翻译兜底不再把 `auto` 固定解释为英语，先按文字脚本和常见词做本地语言判断；有道简体中文代码统一映射为接口要求的 `zh-CHS`。
+- [Added] `PillView.qml`、`tst_narrow.qml`：药丸音乐界面补充“上一首”按钮，接通既有 Windows 系统媒体上一曲命令，并与播放、下一首保持相同反馈和空间收缩规则。
+- [Fixed] 验证：Qt 6.11.2 / MinGW 完整构建通过；多语言英文标识、紧凑列表、单枚裁切图标隐藏与药丸上一首新增检查通过。通用 QML 套件 143 项通过，仅离屏唱片旋转保留 1 项既有计时偶发失败，本轮未修改对应逻辑。
+- [Changed] `ScreenshotTranslationView.qml`、`ScreenshotPreview.qml`、`Main.qml`：截图结果的中英行距收紧为正常正文节奏；原图默认以不超过 82px 的小型缩略图显示在正文上方，眼睛按钮控制显隐，点击缩略图打开独立液态玻璃大图预览。
+- [Fixed] `AppState.cpp`：截图 OCR 与历史截图恢复不再写入普通搜索原文和译文，退出截图模式后保留原搜索内容，避免识别文字出现在搜索框。
+- [Changed] `IOcrProvider.h`、`OcrManager.*`、`WindowsOcrProvider.*`、`SystemOcrBridge.ps1`：OCR 调用传递当前源语言，Windows 桥优先创建对应识别语言引擎，并在系统最大图像尺寸内对小字号截图做最多 3 倍高质量放大。
+- [Fixed] `test_windows_ocr_bridge.py`、`tst_card.qml`：增加深色小字号英文截图、紧凑双语间距、缩略图显隐与放大请求、搜索状态隔离回归检查；小字号 OCR 样例已通过。
+- [Changed] `CardView.qml`、`tst_card.qml`：语言选择与引擎状态改为在红绿灯外框右沿和右侧图标区域左沿之间实时居中，缩放及图标逐步隐藏期间持续按两侧边界更新；压缩状态框由 18×22px 收紧为 14×14px。新增 160–480px 连续宽度间隔居中回归检查。
+- [Changed] `WindowsResizeSession.*`：卡片原生外壳由普通圆弧升级为 2.6 阶连续曲率轮廓，采样在四角两端自适应加密并保持物理像素对齐；底色、裁剪、细边框、流光与缩放反馈共享同一路径，四角在静止和缩放时更柔顺且完全对称。药丸继续使用标准半圆胶囊轮廓。
+- [Changed] `CardView.qml`、`LanguageSelector.qml`：最小与正常卡片复用同一个红绿灯磨砂外框；最小卡片未展开时，左右触发带收紧到顶部 18px，展开后恢复完整操作高度。语言选择与引擎状态统一为 22px 高、9px 字号。
+- [Fixed] `CardView.qml`、`tst_card.qml`：顶部四个功能按钮收紧为 24×24px，确保相邻命中框不重叠，避免点击截图翻译时误触置顶；右侧按钮下移靠近分隔线，分隔线到搜索框的既有 5px 间距保持不变。新增顶部触发带、控件等高与命中区隔离检查，本轮 139 项 QML 检查通过。
+- [Changed] `CardView.qml`、`SearchInput.qml`：最小卡片左右控件展开时不再隐藏搜索框，改为保留低对比磨砂轮廓并弱化文字；最小搜索框收紧为 24px 高、11px 字号。搜索框聚焦期间暂停角落展开，避免编辑内容被覆盖。
+- [Changed] `CardView.qml`：顶部统一为 44px，右侧 28px 图标距顶部 5px、距长分隔线 5px，分隔线到搜索框再留 5px；最小卡片使用 34px 顶部和 24px 搜索框，保持上下各 5px。
+- [Fixed] `CardView.qml`、`tst_card.qml`：移除空状态提示持续 3.8 秒循环的透明度与位移动画，只保留首次出现的 700ms 淡入上移，提示稳定后完全静止。
+- [Fixed] `WindowsResizeSession.*`、`probe_cursor_zones.py`：原生缩放光标离开边缘后主动恢复默认箭头，修复最后一次尺寸光标残留并覆盖整个正文的问题；四角命中区按窗口短边收敛，药丸左右中段恢复单轴缩放光标。新增真实窗口“左边缘→正文中心”光标探针。
+- [Changed] `CardView.qml`、`TrafficLights.qml`：最小卡片左右展开区统一为 24px 高、12px 圆角的轻薄磨砂承载层；搜索框顶部改为 5px，后续进一步收紧为 24px 高并保留弱化磨砂轮廓。
+- [Changed] `CardView.qml`：普通卡片分隔线恢复长细线，仅保留左右各 5px 的圆角安全距离；顶部控件到分隔线、分隔线到搜索框均保持 5px 间距，紧凑标题栏提高到 44px 以避开透明圆角。
+- [Changed] `CardView.qml`、`TrafficLights.qml`：普通卡片右侧功能区恢复无外框图标排版；轻薄磨砂胶囊只在最小卡片右上角展开时出现。顶部分隔线缩短并在两端淡出，搜索框上下留白收紧；卡片红绿灯常态磨砂进一步降低不透明度。
+- [Fixed] `CardView.qml`：最小卡片未展开角落控件时将顶部命中层交给搜索框，修复透明拖动标题层截获点击、输入框无法获得光标的问题；角落控件展开后仍可按原设计覆盖搜索框。
+- [Changed] `TrafficLights.qml`、`CardView.qml`：卡片红绿灯改为 27×14px、5px 灯点的轻量磨砂常态，悬浮后恢复到原 34×18px、7px 灯点；右侧功能按钮加入独立磨砂胶囊背景，避免与搜索框视觉混合。
+- [Changed] `SearchInput.qml`、`PillView.qml`、`CardView.qml`：移除搜索框顶部单独的白色直线高光；普通卡片顶部控制、分隔线与搜索框之间增加分层留白。
+- [Changed] `LayoutScalePanel.qml`、`Main.qml`：页面比例面板收紧为 212×76px，重排标题、比例徽标和缩放控件；窗口显示后按文字排版按钮的屏幕坐标二次定位，空间不足时先上移主卡片并继续从按钮下方打开。
+- [Fixed] `tst_card.qml`：新增最小卡片输入焦点、顶部组独立磨砂容器、红绿灯尺寸与分隔线留白检查；本轮 QML 套件 138 项通过，仅保留 1 项既有的离屏唱片旋转时间取样偶发失败。
+- [Changed] `CardView.qml`：最小卡片搜索框不再为隐藏标题栏预留高度，最终固定距窗口顶部 5px；左上和右上控件继续作为高层覆盖内容。
+- [Fixed] `CardView.qml`、`Main.qml`：紧凑译文显式依赖 `translatedText/definitions` 变化，修复原生 `Q_INVOKABLE` 返回值无法触发 QML 重新求值而导致最小卡片译文不出现；最小状态取消结果淡入等待，结果直接显示。
+- [Changed] `LayoutScalePanel.qml`、`Main.qml`、`CMakeLists.txt`：页面排版控件迁入卡片边框外的独立 220×84px 液态玻璃小窗，固定在主卡片下方；屏幕空间不足时先上移主卡片，保证面板仍从下方打开。
+- [Changed] `CardView.qml`、`Main.qml`：左上、右上和普通卡片最右侧统一增加 110ms 悬浮意图延迟，再以 190–210ms `OutQuart` 容器展开和 140–150ms `OutCubic` 渐显完成过渡。
+- [Fixed] `Main.qml`、`tst_card.qml`：用户已缩至最小的卡片不再被翻译结果触发自动放大，译文直接在当前卡片显示；新增悬浮延迟、向下排版抽屉和最小卡片翻译留驻检查，完整 QML 套件 136 项通过。
+- [Changed] `SearchInput.qml`、`CardView.qml`：卡片搜索框统一为药丸同款 26px 高、13px 半径的液态玻璃胶囊，保留卡片可用横向长度；最小卡片搜索框固定距顶部 8px。
+- [Fixed] `CardView.qml`、`Main.qml`：最小卡片左上角和右上角新增原生坐标感应区，分别揭示红绿灯与完整功能组；普通窄卡片的最右侧感应区也不再依赖已显示图标，修复隐藏后无法展开。
+- [Changed] `CardView.qml`：底部左侧开关与边框至少保持 12px 间距；“文字大小”面板升级为“页面排版”，联动正文、搜索字号、主间距及工具栏密度。
+- [Added] `DatabaseManager.*`、`AppState.*`、`HistoryView.qml`：截图翻译完成后持久化原文、逐行译文、记录类型和预览地址；历史窗口增加截图筛选与类型标识，点击记录恢复原卡片逐行对照。
+- [Fixed] `tst_card.qml`：新增卡片搜索样式、最小卡片双侧揭示区与底部安全间距回归；完整 QML 套件 135 项通过，仅音乐唱片离屏取样仍有 1 项既有偶发失败。
+- [Changed] `PillView.qml`：最小药丸搜索入口从左侧 22px 开始，避开 16px 红绿灯揭示区；空入口改为冷蓝透明底、内层渐变高光、精细描边和居中搜索图标的液态玻璃按钮。
+- [Fixed] `PillView.qml`、`SearchInput.qml`：点击窗口其他区域或切换到其他应用后，药丸搜索立即失焦并收回；最小状态停止呼吸并进入流光消散。药丸与卡片输入光标统一为自然亮灭循环。
+- [Changed] `CardView.qml`：顶部右侧图标移除额外缩放，改用药丸一致的 100ms `OutCubic` 渐显和共享的按钮点击回弹反馈。
+- [Fixed] `tst_narrow.qml`、`tst_card.qml`：覆盖搜索入口与左侧热区间距、液态玻璃层、外部失焦收回、流光停止、双模式光标闪烁和卡片图标动画一致性；相关回归检查通过。
+- [Changed] `PillView.qml`、`Main.qml`：药丸搜索入口移除悬浮展开，只在点击后展开并获得输入焦点；无文字时回到 26px 最小入口，有文字时按字体测量在 46–108px 内分配宽度。
+- [Changed] `PillView.qml`、`Main.qml`、`WindowsResizeSession.cpp`：药丸搜索聚焦复用卡片的 700ms 唤醒、3.8s 呼吸与 850ms 消散流光生命周期，原生药丸外壳同步合成内向柔光和精细光谱边线。
+- [Fixed] `tst_narrow.qml`：新增“悬浮不展开”、点击聚焦流光及空输入失焦收回检查，避免搜索悬浮与最小药丸左侧红绿灯热区争用状态。
+- [Refactored] `TranslatorWindow.*`、`WindowResizeSession.h`、`WindowsResizeSession.*`、`Application.cpp`：黄色交通灯改为完整的原生最小化状态机；最小化前停止尺寸动画、缩放捕获和待提交绘制，Windows Platform 使用 `SW_MINIMIZE`，最小化期间拒绝 `UpdateLayeredWindow`，托盘显示统一走恢复入口。
+- [Fixed] `PillView.qml`：原生鼠标坐标在离屏 QML 指针分发后最终确认左右边缘状态；有隐藏操作时悬浮最右 32px 稳定展开全部图标，160–220px 最小药丸悬浮最左 16px 稳定显示红绿灯。
+- [Fixed] `tst_narrow.qml`：新增最小药丸左边缘红绿灯回归检查，并固定右边缘展开夹具的数据条件；真实 Windows 探针连续观察 4 秒确认窗口持续处于任务栏最小化状态。
+
+### 2026-09-11 — 药丸与卡片切换动效
+
+- [Fixed] `WindowsResizeSession.*`：主窗口原生扩展样式显式启用 `WS_EX_APPWINDOW` 并移除工具窗标记，黄色交通灯最小化后保留可靠的 Windows 任务栏入口。
+- [Changed] `CardView.qml`、`Main.qml`、`TranslatorWindow.*`：丰富词典或较多截图内容统一自动展开为 350×420px，替代原 500px 大卡片；空内容与简短结果仍使用 220×200px。
+- [Changed] `CardView.qml`：顶部保持即时拖动；空白正文、内容未溢出的正文及外围空白支持 280ms 长按移动，搜索框、功能按钮和可滚动长内容保持原交互。
+- [Fixed] `TranslatorWindow.*`、`WindowResizeSession.h`、`WindowsResizeSession.*`：分层窗口原生鼠标链路同步八方向缩放光标，边缘命中带扩大到 10 逻辑像素；悬浮与拖动显示柔和蓝色轮廓反馈，拖动继续使用鼠标捕获直到松开。
+- [Fixed] `tst_card.qml`：新增 350×420 丰富内容尺寸和空白正文长按移动检查；完整 QML 套件本轮 126 项通过，右侧悬浮与唱片离屏时间取样仍各有 1 项既有偶发失败。
+- [Fixed] `check_desktop_ui.py`：可见窗口检查增加最多 3 秒的启动就绪等待，避免离线词典初始化稍慢时把尚未设置标题误判为启动失败。
+- [Fixed] `AppState.*`、`Application.cpp`、`TranslatorWindow.*`：清空搜索原文后同时重置卡片记忆尺寸，并以 180ms 动画恢复 220×200px 初始小卡片；后续自适应高度更新复用已重置宽度，不再停在拉宽后的空卡片。
+- [Fixed] `PillView.qml`、`Main.qml`、`tst_narrow.qml`：药丸黄色交通灯改为请求系统任务栏最小化，不再错误展开为卡片；新增信号链路回归检查。
+- [Changed] `CardView.qml`、`AuroraBorder.qml`：彩色边缘从点击搜索框获得焦点的瞬间开始，以 10% 初始能量立即响应；输入期间保持柔和活动，提交翻译后提升强度，失焦且翻译结束后才消散。
+- [Refactored] `WindowsResizeSession.*`：彩色边缘改为缓存的逐像素圆角距离光场；柔和低饱和色谱使用平滑插值，透明度按高斯与指数曲线向卡片中心衰减，彻底移除短线圆头拼接造成的颗粒、色块和生硬彩虹环。
+- [Changed] `AuroraBorder.qml`：光谱完整漂移周期由 7.6s 放缓至 14.8s，保留 3.8s 呼吸节奏；聚焦态与翻译态使用不同呼吸深度。
+- [Added] `AuroraBorder.qml`、`TranslatorWindow.*`、`WindowResizeSession.h`、`WindowsResizeSession.cpp`：翻译期间加入 Apple Intelligence 风格的蓝、紫、粉、金、绿流动边缘；原生外壳使用 1.5px 内侧精细描边和约 20px 内向柔光，正文中央保持完全清透。
+- [Changed] `AuroraBorder.qml`：QML 只管理 700ms 晨曦唤醒、3.8s 呼吸循环和 850ms 暮光消散；Platform 在既有 GDI+ 整帧外壳中绘制光环，消散完成后停止旋转与提交，避免软件场景纹理破坏透明窗口。
+- [Changed] `CardView.qml`：空状态提示改为正文页面水平与垂直居中，加入 700ms 淡入上浮和 3.8s 低幅呼吸动效。
+- [Fixed] `tst_card.qml`：新增提示居中、提示呼吸、彩色边缘唤醒/呼吸/消散生命周期检查；完整构建与真实分层窗口强制视觉状态检查通过。
+- [Changed] `TranslatorWindow.*`、`CardView.qml`：默认空卡片由 380×260px 收紧为 220×200px；丰富结果仍可按内容展开至 500px，并保留用户手动拉伸后的独立卡片尺寸。
+- [Changed] `TrafficLights.qml`、`CardView.qml`：卡片红绿灯使用 34×18px 空闲外框与 7px 灯点，悬浮后平滑恢复可操作尺寸；固定预留 40–44px 区域，使其与语言选择器保持间距。
+- [Changed] `Main.qml`：点击卡片音乐图标会收起卡片并直接进入药丸音乐模式；药丸唱片点击仍打开多行歌词面板。
+- [Fixed] `SearchInput.qml`、`CardView.qml`：搜索框聚焦时光标正常闪烁，点击卡片搜索框外的正文、顶部或底部会立即退出编辑焦点。
+- [Changed] `CardView.qml`：翻译等待改为无文字的三色轻波动；结果返回后使用 180ms 淡入与 220ms、7px 上移归位，避免内容突然出现。
+- [Changed] `CardView.qml`、`SearchInput.qml`、`PillView.qml`：空状态精简为“所见，即所译”和“输入、粘贴，或直接划取文字”，输入框与药丸提示同步减少说明感。
+- [Fixed] `tst_card.qml`：新增卡片翻译等待、结果入场和搜索失焦检查，并将尺寸及红绿灯断言同步到紧凑布局；通用 QML 套件本轮 123 项通过，右侧悬浮与唱片离屏时间取样仍各有 1 项既有偶发失败。
+- [Fixed] `PillView.qml`：移除药丸宽于 440px 时禁用搜索点击的错误限制，任意用户拉伸宽度下都能点开输入框并键入内容。
+- [Changed] `SearchInput.qml`、`PillView.qml`、`CardView.qml`：卡片和药丸输入焦点增加清晰的蓝色描边与光标；空状态文案最终统一为“所见，即所译”和简短的输入提示。
+- [Fixed] `TranslatorWindow.cpp`：自绘窗口点击搜索区域时重新确认原生窗口激活，再把焦点交给离屏 QML 输入框，提升首次点击及中文输入法的可靠性。
+- [Fixed] `tst_narrow.qml`：新增 480px 宽药丸点击、获得焦点与键盘输入回归用例；该用例修复前稳定失败、修复后通过。
+- [Fixed] `AppState.cpp`、`SearchInput.qml`、`PillView.qml`：划词文本统一经 `setSourceText()` 写入状态，卡片与药丸搜索框立即同步显示；药丸无需等待译文返回即可展示划词原文。
+- [Changed] `AppState::clearText()`：清空原文时同步清除译文、音标、释义、例句、同反义词、词形、错误与加载状态，迟到的空源翻译结果不会重新填回界面。
+- [Changed] `PillView.qml`：搜索原文为空时退出编辑并以 150ms 动画收回 26px 最小搜索入口；卡片搜索清除按钮改走统一清理入口。
+- [Fixed] `SearchInput.qml`：输入框不再从内部反向覆盖外部文本绑定，解决划词后仍残留上一次手输内容；截图按钮不再同时误触发划词复制流程。
+- [Changed] `AppState.cpp`：移除启动时写死的 “Efficient” 演示原文、译文、音标和释义，程序从真实空状态启动，药丸搜索入口默认保持最小。
+- [Fixed] 实机验证：Windows 全局划词后，原文会立即出现在药丸搜索区域并正常返回译文；清空后结果不回弹，重新启动保持 26px 最小搜索入口，窗口持续正常响应。
+- [Fixed] `tst_card.qml`、`tst_narrow.qml`：覆盖外部划词同步、卡片清除结果、翻译期间药丸显示原文及空药丸自动最小化；通用 QML 套件 122 项通过，唱片旋转离屏时间取样仍有 1 项既有偶发失败。
+- [Changed] `CardView.qml`、`Main.qml`、`TranslatorWindow.cpp`：卡片改为内容驱动的两档高度；无数据与短释义使用 260px 紧凑卡片，包含例句、同反义词、词形或较多截图行时平滑展开到 500px 大卡片，保留用户当前宽度。
+- [Fixed] `TranslatorWindow.cpp`：自适应高度动画直接复用 QWindow 逻辑宽度，避免 125% 等分数 DPI 下重复换算造成卡片横向缩窄。
+- [Fixed] 实机验证：125% DPI 下短结果为 260px、五组截图翻译为 500px，切换前后物理宽度均为 475px；窗口保持响应且正文与底栏正常显示。
+- [Fixed] `tst_card.qml`：新增空内容、短词典结果和丰富词典结果的自适应高度回归检查；通用 QML 套件 119 项通过，唱片旋转的离屏时间取样仍有 1 项既有偶发失败。
+- [Docs] `README.md`、`docs/ARCHITECTURE.md`、`docs/DESIGN_SYSTEM.md`：同步卡片尺寸状态、判定依据与动画边界。
+- [Changed] `AppState.*`：截图翻译改用独立 TranslationManager 按 OCR 行顺序逐条翻译并渐进回填，保证每条原文紧跟自己的中文译文，不再依赖整段译文的换行数量。
+- [Changed] `ScreenshotTranslationView.qml`：对齐参考图改为连续阅读排版；英文使用较粗白字，下一行中文使用灰白字，移除序号、卡片框和彩色分隔线。
+- [Fixed] `ScreenshotTranslationView.qml`：双语文本宽度明确跟随卡片正文，在窄卡片中按可用宽度换行，不再被长句固有宽度撑开后从右侧裁掉。
+- [Changed] `Main.qml`、`CardView.qml`、`ScreenshotTranslationView.qml`：截图结果不再创建额外工具窗口；框选结束后复用现有 TranslatorWindow 并展开为卡片，在原正文区域按原文一行、译文一行连续显示。
+- [Changed] `AppState.*`：新增 `screenshotMode` 与退出方法，截图识别、翻译、失败和完成均保持在同一卡片状态；重新框选继续复用该卡片。
+- [Fixed] `tst_card.qml`：验证截图状态隐藏普通搜索/结果并在同一个 CardView 正文中显示双语对照。
+- [Docs] `README.md`、`docs/ARCHITECTURE.md`、`docs/API.md`、`docs/DESIGN_SYSTEM.md`：将截图结果交互修正为现有卡片内展示。
+- [Fixed] `Application.cpp`：截图开始时隐藏主卡片不再触发 Qt“最后窗口关闭”退出，托盘进程会在主卡片与框选层交接期间保持运行。
+- [Added] `ScreenCaptureOverlay.qml`、`CaptureManager.cpp`：加入当前鼠标所在屏幕的真实截图、全屏暗色框选层、选区裁剪、Escape 取消与原图预览。
+- [Added] `WindowsOcrProvider.cpp`、`SystemOcrBridge.ps1`：通过 Windows 内置 `Windows.Media.Ocr` 异步识别选区，不要求额外安装 OCR 模型。
+- [Changed] `AppState.cpp`、`ScreenshotTranslationView.qml`：截图文字接入当前翻译引擎，显示“识别中/翻译中/失败/完成”状态；删除会伪装成功的演示数据。
+- [Fixed] `Application.cpp`、`Main.qml`：卡片、药丸、托盘和 `Ctrl+Shift+S` 统一进入截图流程，重新截图不再误触发划词翻译。
+- [Added] `test_windows_ocr_bridge.py`、`probe_screenshot_entry.py`：分别验证真实 Windows OCR 结果和快捷键打开/取消选区层的窗口生命周期。
+- [Fixed] 验证：Qt/MinGW 完整构建通过；生成图片的 Windows OCR 集成检查通过；真实进程框选后恢复现有翻译卡片且未创建第二个结果窗口。通用 QML 套件 118 项通过，唱片旋转的离屏时间取样检查仍有 1 项既有偶发失败，与截图链路无关。
+- [Docs] `README.md`、`docs/ARCHITECTURE.md`、`docs/API.md`、`docs/DESIGN_SYSTEM.md`：同步真实截图翻译能力、边界和交互规范。
+- [Changed] `MediaSessionService.cpp`：同步歌词切换点统一提前 650ms，让药丸和音乐卡片先显示下一句、随后接近人声开唱；普通无时间戳歌词保持原行为。
+- [Docs] `docs/API.md`、`docs/DESIGN_SYSTEM.md`：记录歌词预读偏移及适用边界。
+- [Added] `SystemMediaBridge.ps1`、`WindowsMediaManager.*`、`MediaSessionService.*`：读取 GSMTC 媒体缩略图并转换为圆形 PNG 数据源；药丸与音乐卡片使用真实封面旋转，静止外环实时绘制播放进度。
+- [Added] `ILyricsProvider.h`、`LrclibLyricsProvider.*`：新增可替换歌词 Provider 接口和 LRCLIB 实现，按歌名、歌手、专辑及可用时长顺序请求同步歌词，精确匹配失败后延迟 300ms 搜索回退，并缓存当前会话结果。
+- [Changed] `PillView.qml`：音乐药丸第一行合并显示歌名与歌手，第二行显示当前歌词；封面唱片、音柱和歌词跟随真实播放状态。
+- [Changed] `MusicIslandCard.qml`：歌词区改为可使用鼠标滚轮、触控板及拖动浏览的多行列表，同步歌词自动居中当前行并用绿色强调；封面外环和时间轴共享同一进度。
+- [Changed] `MediaSessionService.*`：播放器公开 GSMTC 时间轴时使用系统位置；未公开时间轴时采用歌词匹配时长，并从检测到曲目后本地递增，以维持歌词与进度反馈。
+- [Fixed] `tests/qml/tst_toolbar.qml`、`tests/qml/tst_narrow.qml`、`tests/qml/tst_card.qml`：覆盖多行歌词模型、当前行、滚动能力、封面旋转和进度环比例；117 项 QML 回归检查通过。
+- [Docs] `README.md`、`docs/API.md`、`docs/ARCHITECTURE.md`、`docs/DESIGN_SYSTEM.md`：同步媒体封面、进度环、歌词 Provider、联网边界和时间轴降级规则。
+- [Fixed] `HoverScrollText.qml`、`PillView.qml`：药丸核心结果强制将词性与第一条重要释义放在同一行，窄宽度仅裁切或悬浮滚动，不再上下分行。
+- [Fixed] `MediaSessionService.*`、`WindowsMediaManager.*`、`SystemMediaBridge.ps1`、`AppState.*`、`Application.*`：删除写死的演示歌单和伪连接状态，接入 Windows GSMTC 当前媒体会话，实时同步播放器连接、播放状态、歌曲、歌手、专辑和可用进度，并把播放暂停、上下曲与进度操作转发给当前系统播放器。
+- [Changed] `MusicIslandCard.qml`：未连接、播放和暂停状态使用真实媒体状态；播放器未提供时间轴时显示不可用进度，不再伪造 180 秒进度或演示歌词。
+- [Fixed] `tests/qml/tst_narrow.qml`：增加词性与核心释义单行垂直对齐回归检查；桌面构建与 116 项 QML 回归检查通过。
+- [Docs] `README.md`、`docs/API.md`、`docs/ARCHITECTURE.md`、`docs/DESIGN_SYSTEM.md`：同步真实系统媒体桥接边界、界面降级状态和药丸单行释义规范。
+- [Changed] `PillView.qml`：右侧完整操作组展开时，普通宽度药丸继续保留红绿灯及安全间距；最小药丸仍遵循左边缘悬浮显示规则。
+- [Changed] `PillView.qml`：翻译等待状态移除“翻译中”文字，改为蓝、紫、绿色三点波浪动效；结果返回后立即切换为词性与核心释义。
+- [Changed] `IconButton.qml`：所有图标操作增加即时按压、回弹和 280ms 蓝色执行环反馈；复制进一步使用 `justCopied` 业务状态显示完成反馈，无有效内容的复制与朗读入口明确禁用。
+- [Fixed] `PillView.qml`、`Main.qml`：药丸“截图翻译”从误接的划词复制流程改为发出 `screenshotRequested` 并打开独立截图窗口。
+- [Fixed] `tests/qml/tst_narrow.qml`、`tests/qml/tst_toolbar.qml`：逐项验证复制、截图、音乐、设置、朗读与展开入口，覆盖加载动效运行、红绿灯在右侧展开时保留及图标执行反馈。
+- [Docs] `README.md`、`docs/ARCHITECTURE.md`：明确截图入口已接通，但框选捕获、OCR Provider 与真实逐行翻译尚未完成，演示数据不作为功能可用证据。
+- [Changed] `TrafficLights.qml`、`PillView.qml`：药丸红绿灯外框由静止 34×18px 随悬浮平滑放大到 44×22px，正文左边距跟随实际外框宽度让位，静止时释放横向空间。
+- [Changed] `PillView.qml`：搜索框使用实际字体测量按当前单词长度在 46–108px 内分配宽度；编辑状态同样随输入增长，长词到达正常搜索框上限后改用局部悬浮滚动。
+- [Changed] `PillView.qml`：药丸只展示第一条核心释义，词性使用主题蓝、正文使用主文本色；译文按测量宽度优先占位，右侧次要操作按剩余空间逐项收起，悬浮真实最右侧后完整展开并推动搜索和译文让位。
+- [Fixed] `tests/qml/tst_narrow.qml`：增加红绿灯外框整体缩放、单词驱动搜索宽度上限、核心释义裁剪与词性颜色、内容优先隐藏操作的回归验证。
+- [Fixed] `PillView.qml`、`HoverScrollText.qml`、`TrafficLights.qml`、`TranslatorWindow.cpp`：增加窗口级指针状态；原生离开事件直接关闭搜索/右侧展开并禁用滚动与悬浮动画，解决离屏 HoverHandler 未及时复位的问题。
+- [Changed] `PillView.qml`：搜索获得焦点后自动全选当前原词，直接键入即可替换并回车翻译。
+- [Fixed] `Main.qml`、`PillView.qml`、`TranslatorWindow.cpp`：每个真实鼠标移动都同步窗口级指针状态，并由药丸直接计算最右 32px 命中；搜索预览必须同时满足“指针仍在窗口内”，消除 Qt 离屏悬浮残留导致的假展开。
+- [Fixed] `Main.qml`、`PillView.qml`、`TranslatorWindow.cpp`：药丸搜索加入原生点击前焦点准备，分层窗口收到点击时直接定位搜索框并激活编辑器，修复只能展开却无法稳定输入和回车提交的问题。
+- [Fixed] `WindowsResizeSession.cpp`、`WindowsResizeSession.h`、`TranslatorWindow.cpp`：Windows 原生层开始跟踪并转发 `WM_MOUSELEAVE`，鼠标离开窗口后清除所有 QML 悬浮状态，译文滚动、搜索展开和右侧操作不会继续滞留。
+- [Changed] `PillView.qml`、`TrafficLights.qml`：最右展开热区改为贴边 32×30px 悬浮点击区；药丸红绿灯静止为 7px 小点，悬浮后以 140ms 展开到 9px。
+- [Fixed] `tests/qml/tst_narrow.qml`：同步验证红绿灯静止/悬浮尺寸、搜索焦点、真实最右边缘触发及离开后的滚动复位。
+- [Fixed] `ui/pill/PillView.qml`：搜索入口由覆盖式 `MouseArea` 改为明确的轻触处理，避免与输入框焦点竞争；隐藏操作的悬浮感应区贴合窗口真实最右边缘，不再留下 10px 无响应区。
+- [Changed] `ui/pill/PillView.qml`：翻译完成且鼠标不在药丸上时自动退出搜索编辑；紧凑搜索框保留原词，长原词仅在自身悬浮时滚动并在移开后复位。
+- [Fixed] `tests/qml/tst_narrow.qml`：增加真实点击聚焦、窗口最右侧展开、译文悬浮滚动/移出归零，以及翻译完成后搜索收起并保留原词的交互回归。
+- [Fixed] `ui/pill/PillView.qml`：重整药丸状态逻辑；仅当右侧确有功能被收起时开放最右边缘展开，正常宽度六项功能齐全时悬浮不再改变布局。
+- [Fixed] `ui/pill/PillView.qml`：搜索编辑不再隐藏译文或整个功能区；输入框按当前宽度限制在 64–108px，译文保留最低可读空间，右侧功能按剩余空间逐项调整。
+- [Fixed] `tests/qml/tst_narrow.qml`：覆盖正常宽度右侧悬浮无副作用、搜索编辑期间译文持续可见、极窄宽度仍保留译文和至少一个操作。
+- [Fixed] `ui/pill/PillView.qml`：修正普通 380px 药丸过早隐藏右侧功能的问题；默认状态同时保留可读译文和六项紧凑操作，只有继续缩窄时才按实际剩余空间逐项收起。
+- [Fixed] `ui/pill/PillView.qml`：最右悬浮展开改为边缘触发的显式状态，消除展开区域覆盖鼠标后自锁的问题；展开期间先推走红绿灯与搜索入口，译文继续优先使用剩余空间，右侧边缘保持固定。
+- [Changed] `ui/pill/PillView.qml`：搜索入口缩为 26px 初始药丸，悬浮自动展开至 96px 并显示输入内容，移出自动复位；点击后保持药丸模式并进入编辑。
+- [Fixed] `tests/qml/tst_narrow.qml`：新增普通宽度完整六操作、译文最低可读宽度、搜索悬浮展开与复位测试，并等待右侧展开动画稳定后再检查固定边缘。
+- [Changed] `ui/pill/PillView.qml`、`ui/components/TrafficLights.qml`：翻译药丸改为内容优先的流式布局；红绿灯使用 44×22 紧凑规格，搜索保持在左侧，右侧六项操作固定右边缘并按可用宽度从左向右逐项裁入。
+- [Changed] `ui/pill/PillView.qml`：悬浮最右 28px 热区时，操作组以 160ms `OutQuart` 向左展开，译文同步让出空间；移出后恢复当前宽度对应的按钮数量，搜索展开和红绿灯展开状态互斥以避免重叠。
+- [Changed] `TranslatorWindow.cpp`、`WindowsResizeSession.cpp`：药丸开放原生四边与四角缩放，高度限制为 38–72px；分别记忆药丸和卡片尺寸，切换模式后恢复各自上次大小。
+- [Changed] `WindowsResizeSession.cpp`：原生玻璃外壳增加随高度渐变的冷色高光层，保持单一玻璃层和文字对比度。
+- [Fixed] `tests/qml/tst_narrow.qml`：覆盖右侧操作展开、右边缘固定、译文动态让位及搜索/译文/操作区互不重叠。
+- [Docs] `README.md`、`docs/DESIGN_SYSTEM.md`、`docs/ARCHITECTURE.md`：同步药丸缩放、内容优先布局与玻璃材质边界。
+- [Changed] `ui/pill/PillView.qml`：药丸搜索入口恢复为 28px 小药丸；宽度低于 440px 时点击会在当前药丸内平滑展开输入框并立即获得光标，不再切换到卡片，最窄状态会临时收起次要操作为输入让位。
+- [Fixed] `tests/qml/tst_narrow.qml`：验证最窄药丸点击搜索后仍处于药丸模式、输入框展开并获得键盘焦点，Escape 可收回。
+- [Changed] `ui/Main.qml`、`core/window/TranslatorWindow.cpp`：药丸与卡片内容改为可中断的交叉淡入，窗口以顶部水平中心为锚点做 200ms 展开和约 170ms 收起，快速反向操作从当前几何继续。
+- [Changed] `WindowResizeSession.h`、`WindowsResizeSession.cpp`：切换期间按当前高度连续计算外壳圆角，避免卡片收起时提前变成高胶囊造成轮廓突变。
+- [Changed] `ui/pill/PillView.qml`：普通药丸常显红绿灯；宽度不超过 220px 的最小状态默认隐藏，鼠标进入最左侧后淡入并平滑为控制区让出空间，移出后恢复。
+- [Changed] `ui/card/SearchInput.qml`：卡片搜索框由接近胶囊的圆角改为 8–10px 方圆角；药丸搜索入口仍保留半高圆角的小药丸轮廓。
+- [Fixed] `tests/qml/tst_narrow.qml`：增加普通药丸红绿灯常显、最小状态隐藏、左侧悬浮展开及内容让位的回归验证。
+- [Fixed] `scripts/check_desktop_ui.py`：兼容 Windows 为独立设置窗追加父窗口标题，继续验证设置入口和 Escape 关闭交互。
+- [Docs] `docs/DESIGN_SYSTEM.md`、`docs/ARCHITECTURE.md`：同步模式过渡、红绿灯断点、搜索框圆角和原生外壳圆角策略。
+
+### 2026-09-10 — 桌面界面与 Web 主题统一
+
+- [Changed] `WordDetailView.qml`：取消固定 420px 三栏断点，按可用宽度、当前区块数量和每栏最低可读宽度实时计算 1–3 栏。
+- [Added] `CardView.qml`：正文区增加鼠标滚轮与触控板滚动处理；滚轮档位使用 110ms 短动画，触控板像素滚动直接跟手，并在交互期间显示滚动条。
+- [Fixed] `tests/qml/tst_card.qml`、`tests/qml/tst_narrow.qml`：覆盖无需拖动滑块的滚轮滚动，以及 1/2/3 栏随宽度自动切换。
+- [Changed] `WordDetailView.qml`：宽卡片把词形、同义词和反义词按实际存在的区块自动分栏，窄卡片继续纵向排列，减少短内容集中在左侧造成的大块留白。
+- [Changed] `CardView.qml`：内容滚动条静止时完全隐藏，仅在滚动或直接悬浮滚动条时以 110ms 淡入；继续保留溢出范围与最小卡片圆角保护。
+- [Fixed] `tests/qml/tst_card.qml`、`tests/qml/tst_narrow.qml`：新增静止滚动条隐藏与宽卡片横向空间利用验证。
+- [Changed] `ui/card/WordDetailView.qml`：删除单词下方的考试标签；词形变化移动到双语例句之后，内容顺序改为主释义、例句、词形、同义词、反义词。
+- [Fixed] `ui/card/SearchInput.qml`、`ui/card/CardView.qml`：输入框显式支持点击聚焦、鼠标选区和持久选择；内容溢出时显示低干扰圆角滚动条，滚动时增强，最小卡片不侵入圆角。
+- [Changed] `DesignTokens.qml` 及各 QML 界面：简体中文界面统一使用系统自带 `Microsoft YaHei UI`，音标和数值使用 `Cascadia Mono`；短反馈、常规动效及工具窗开关缩短为 110/180/160/100ms。
+- [Fixed] `tests/qml/tst_card.qml`、`tests/qml/tst_narrow.qml`：增加鼠标点击输入、内容滚动条和“例句后显示词形”的回归验证。
+- [Docs] `docs/DESIGN_SYSTEM.md`：同步字体、内容顺序、滚动条和动效时序。
+- [Fixed] `SearchInput.qml`、`Main.qml`、`CardView.qml`、`TranslatorWindow.*`、`WindowsResizeSession.cpp`：点击输入框时显式建立离屏 QML 焦点与原生宿主键盘焦点，回车现在会从输入框提交一次翻译。
+- [Added] `providers/fallback/FallbackProvider.*`：新增实现 `ITranslationProvider` 的免密在线兜底，组合 MyMemory 文本翻译、Tatoeba 双语例句以及 Datamuse 同义词/反义词，并由本地 ECDICT 补齐词典信息。
+- [Changed] `TranslationManager.cpp`、`AppState.cpp`、`GeminiProvider.cpp`：在线引擎不再被本地词典提前截断；在线丰富字段返回后再用 ECDICT 补足中文释义、音标和词形；Gemini 结果同时要求同义词与反义词。
+- [Fixed] `tests/qml/tst_card.qml`、`tests/qml/tst_narrow.qml`：新增输入、状态同步、回车提交以及双语例句/同反义词渲染回归测试。
+- [Docs] `README.md`、`docs/API.md`、`docs/ARCHITECTURE.md`：记录免密降级顺序、数据来源、限制与隐私边界。
+- [Changed] `ui/card/WordDetailView.qml`：单词、音标和美/英发音改为按内容实际宽度自适应；三者可容纳时保持同一行，确实放不下时才安全分行。
+- [Changed] `ui/card/CardView.qml`：底部功能栏从固定断点改为按剩余宽度分配按钮，竖向空间足够时继续显示；优先保留当前可用功能，避免仍有空间却提前隐藏。
+- [Fixed] `tests/qml/tst_narrow.qml`、`tests/qml/tst_card.qml`：增加单行词头对齐和 220×180 紧凑卡片完整底栏回归验证。
+- [Changed] `ui/card/CardView.qml`：移除卡片最下方的语言方向与窗口尺寸状态行，底部只保留一层功能栏；文字大小入口移入底栏并改为向上展开，顶部原位置替换为音乐控制入口。
+- [Fixed] `ui/card/CardView.qml`、`tests/qml/tst_card.qml`：按宽度逐步收起复制、朗读、收藏与历史按钮，保证最窄宽度下 Smart-Select 与文字大小入口不重叠；新增音乐入口及底部文字调节交互回归测试。
+- [Changed] `ui/card/CardView.qml`：恢复稳定边框重建前的顶部布局。红绿灯固定 48px 保留区；语言和引擎分别悬浮展开；中间压到 58px 后，右侧截图、置顶、音乐从左侧依次裁入，保留最右设置热区。
+- [Changed] `ui/card/CardView.qml`：右侧工具固定右边缘，以 160ms `OutQuart` 向左展开，并按可见比例同步淡入与缩放；底部使用 Smart-Select、复制、朗读、收藏、历史及文字大小组成的单层功能栏。
+- [Fixed] `tests/qml/tst_card.qml`：验证各宽度下工具组互不遮挡；语言与引擎不会同时展开；三种悬浮状态下红绿灯的位置和宽度均不变化；移出后恢复当前宽度布局。
+- [Changed] `ui/card/CardView.qml`、`ui/pill/PillView.qml`：主卡片与药丸沿用 Web 端深色玻璃主题；药丸窄屏入口直接打开设置，不再显示快捷操作菜单。
+- [Refactored] `ui/Main.qml`：删除重复的快捷操作窗口，原入口改为偏好设置；设置、历史、音乐和截图窗口共享 190ms 打开、120ms 关闭的缩放淡入动效。
+- [Changed] `DesignTokens.qml`、`SettingsView.qml`、`HistoryView.qml`、`MusicIslandCard.qml`：统一 Web 端深色玻璃表面、26px 工具窗圆角、边框、顶部层级和 120ms 控件反馈。
+- [Fixed] `tests/qml/tst_card.qml`：窄尺寸始终检查设置入口，并验证点击后直接触发偏好设置，防止删除快捷操作后丢失核心配置入口。
+- [Fixed] `WindowsResizeSession.cpp`：Qt 首次显示主窗口后重新确认原生窗口过程挂接，保证内容点击与稳定边框继续走同一输入路径。
+- [Docs] `README.md`、`docs/DESIGN_SYSTEM.md`、`docs/ARCHITECTURE.md`、`docs/WINDOW_UI_REBUILD.md`：同步统一主题、窗口入口和动效约束。
+
 ### 2026-09-09 — 原生内容输入与测试边框统一
 
 - [Fixed] `WindowsResizeSession.*`：主窗口过程统一接收边框拖动和内容区鼠标输入，避免离屏 QML 窗口漏收点击。

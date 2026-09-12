@@ -13,52 +13,58 @@ ColumnLayout {
     property var synonyms: []
     property var antonyms: []
     property var wordForms: []
-    property var tags: []
     property real fontScale: DesignTokens.fontScale
     property bool compact: false
     property bool veryCompact: false
     property bool ultraCompact: false
+    readonly property real headerNaturalWidth: wordTitle.implicitWidth + wordPhonetic.implicitWidth + speechButtons.implicitWidth + 16
+    readonly property bool singleLineHeader: width >= headerNaturalWidth
+    readonly property int lexicalSectionCount: (wordForms.length > 0 ? 1 : 0)
+                                               + (synonyms.length > 0 ? 1 : 0)
+                                               + (antonyms.length > 0 ? 1 : 0)
+    readonly property real lexicalColumnMinWidth: compact ? 128 : 144
 
     spacing: wordDetail.ultraCompact ? 6 : (wordDetail.veryCompact ? 8 : (wordDetail.compact ? 10 : 12))
 
-    // 长单词、音标和发音各有独立边界；窄窗口自动分行。
+    // 空间充足时单词、音标和发音共用一行；只有实际放不下时才分行。
     GridLayout {
         id: wordHeader
+        objectName: "wordHeader"
         Layout.fillWidth: true
         Layout.minimumWidth: 0
-        columns: wordDetail.width < 360 * wordDetail.fontScale ? 1 : 2
+        columns: wordDetail.singleLineHeader ? 3 : 1
         columnSpacing: 8
         rowSpacing: 6
 
-        ColumnLayout {
-            Layout.fillWidth: true
+        Text {
+            id: wordTitle
+            objectName: "wordTitle"
+            Layout.fillWidth: !wordDetail.singleLineHeader
             Layout.minimumWidth: 0
-            spacing: 4
-            Text {
-                objectName: "wordTitle"
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-                text: wordDetail.word
-                color: DesignTokens.textPrimary
-                font.bold: true
-                font.pixelSize: Math.round((wordDetail.ultraCompact ? 15 : (wordDetail.compact ? 17 : 20)) * wordDetail.fontScale)
-                font.family: "Segoe UI"
-                wrapMode: Text.WrapAnywhere
-                visible: text.length > 0
-            }
-            Text {
-                objectName: "wordPhonetic"
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
-                text: wordDetail.phonetic.length > 0 ? (wordDetail.phonetic.startsWith("/") ? wordDetail.phonetic : "/" + wordDetail.phonetic + "/") : ""
-                color: "#93c5fd"
-                font.pixelSize: Math.round((wordDetail.ultraCompact ? 10 : (wordDetail.compact ? 11 : 12)) * wordDetail.fontScale)
-                font.family: "Consolas"
-                wrapMode: Text.WrapAnywhere
-                visible: text.length > 0
-            }
+            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+            text: wordDetail.word
+            color: DesignTokens.textPrimary
+            font.bold: true
+            font.pixelSize: Math.round((wordDetail.ultraCompact ? 15 : (wordDetail.compact ? 17 : 20)) * wordDetail.fontScale)
+            font.family: DesignTokens.fontUi
+            wrapMode: wordDetail.singleLineHeader ? Text.NoWrap : Text.WrapAnywhere
+            visible: text.length > 0
+        }
+        Text {
+            id: wordPhonetic
+            objectName: "wordPhonetic"
+            Layout.fillWidth: !wordDetail.singleLineHeader
+            Layout.minimumWidth: 0
+            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+            text: wordDetail.phonetic.length > 0 ? (wordDetail.phonetic.startsWith("/") ? wordDetail.phonetic : "/" + wordDetail.phonetic + "/") : ""
+            color: "#93c5fd"
+            font.pixelSize: Math.round((wordDetail.ultraCompact ? 10 : (wordDetail.compact ? 11 : 12)) * wordDetail.fontScale)
+            font.family: DesignTokens.fontMono
+            wrapMode: wordDetail.singleLineHeader ? Text.NoWrap : Text.WrapAnywhere
+            visible: text.length > 0
         }
         Row {
+            id: speechButtons
             objectName: "wordSpeechButtons"
             Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
             spacing: 4
@@ -100,37 +106,13 @@ ColumnLayout {
         }
     }
 
-    // === 考试标签行 ===
-    Flow {
-        Layout.fillWidth: true
-        visible: wordDetail.tags.length > 0
-        spacing: 4
-        Repeater {
-            model: wordDetail.tags
-            delegate: Rectangle {
-                radius: 4
-                color: "#1a3b82f6"
-                implicitWidth: tagText.implicitWidth + 8
-                height: 16
-                Text {
-                    id: tagText
-                    anchors.centerIn: parent
-                    text: modelData
-                    color: "#93c5fd"
-                    font.pixelSize: 9
-                    font.weight: Font.Medium
-                }
-            }
-        }
-    }
-
     // 英文释义
     Text {
         Layout.fillWidth: true
         text: wordDetail.englishDefinition
         color: "#80ffffff"
         font.pixelSize: wordDetail.compact ? 11 : 12
-        font.family: "Georgia"
+        font.family: DesignTokens.fontReading
         font.italic: true
         wrapMode: Text.Wrap
         visible: wordDetail.englishDefinition.length > 0
@@ -184,7 +166,7 @@ ColumnLayout {
                     color: "#f2ffffff"
                     font.pixelSize: Math.round((wordDetail.ultraCompact ? 12 : (wordDetail.compact ? 14 : 15)) * wordDetail.fontScale)
                     font.weight: Font.DemiBold
-                    font.family: "Segoe UI"
+                    font.family: DesignTokens.fontUi
                     wrapMode: Text.Wrap
                 }
             }
@@ -213,7 +195,7 @@ ColumnLayout {
                             text: modelData.partOfSpeech ? modelData.partOfSpeech : ""
                             color: "#60a5fa"
                             font.pixelSize: 10
-                            font.family: "Consolas"
+                            font.family: DesignTokens.fontMono
                             font.bold: true
                             visible: text.length > 0
                         }
@@ -223,61 +205,8 @@ ColumnLayout {
                             text: modelData.meaning ? modelData.meaning : ""
                             color: "#ccffffff"
                             font.pixelSize: Math.round((wordDetail.ultraCompact ? 11 : 12) * wordDetail.fontScale)
-                            font.family: "Segoe UI"
+                            font.family: DesignTokens.fontUi
                             wrapMode: Text.Wrap
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // === 词形变化 ===
-    ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 4
-        visible: wordDetail.wordForms.length > 0
-
-        Text {
-            text: "词形变化"
-            color: DesignTokens.textPlaceholder
-            font.pixelSize: 9
-            font.weight: Font.DemiBold
-            font.letterSpacing: 1
-            font.capitalization: Font.AllUppercase
-        }
-
-        Flow {
-            Layout.fillWidth: true
-            spacing: 6
-
-            Repeater {
-                model: wordDetail.wordForms
-                delegate: Rectangle {
-                    radius: 6
-                    color: "#08ffffff"
-                    border.color: DesignTokens.borderSubtle
-                    border.width: 1
-                    implicitWidth: formRow.implicitWidth + 12
-                    height: 22
-
-                    Row {
-                        id: formRow
-                        anchors.centerIn: parent
-                        spacing: 4
-                        Text {
-                            text: modelData.name + ":"
-                            color: "#80ffffff"
-                            font.pixelSize: 9
-                            font.weight: Font.Medium
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            text: modelData.value
-                            color: "#e6ffffff"
-                            font.pixelSize: 10
-                            font.weight: Font.Medium
-                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
                 }
@@ -287,6 +216,7 @@ ColumnLayout {
 
     // === 双语例句 ===
     ColumnLayout {
+        objectName: "bilingualExamples"
         Layout.fillWidth: true
         spacing: 4
         visible: wordDetail.examples.length > 0
@@ -329,7 +259,7 @@ ColumnLayout {
                             text: modelData.src
                             color: "#e6ffffff"
                             font.pixelSize: 11
-                            font.family: "Georgia"
+                            font.family: DesignTokens.fontReading
                             wrapMode: Text.Wrap
                         }
                         Text {
@@ -337,7 +267,7 @@ ColumnLayout {
                             text: modelData.dst
                             color: "#80ffffff"
                             font.pixelSize: 10
-                            font.family: "Segoe UI"
+                            font.family: DesignTokens.fontUi
                             wrapMode: Text.Wrap
                         }
                     }
@@ -365,9 +295,79 @@ ColumnLayout {
         }
     }
 
+    // 宽卡片横向利用空间，窄卡片仍按词形、同义词、反义词顺序排列。
+    GridLayout {
+        id: lexicalGrid
+        objectName: "lexicalGrid"
+        Layout.fillWidth: true
+        columns: Math.max(1, Math.min(wordDetail.lexicalSectionCount,
+                    Math.floor((width + columnSpacing) / (wordDetail.lexicalColumnMinWidth + columnSpacing))))
+        uniformCellWidths: columns > 1
+        columnSpacing: 12
+        rowSpacing: 10
+        visible: wordDetail.lexicalSectionCount > 0
+
+    // === 词形变化：紧跟例句，先看用法再看派生形式 ===
+    ColumnLayout {
+        id: wordFormsSection
+        objectName: "wordFormsSection"
+        Layout.fillWidth: true
+        Layout.alignment: Qt.AlignTop
+        spacing: 4
+        visible: wordDetail.wordForms.length > 0
+
+        Text {
+            text: "词形变化"
+            color: DesignTokens.textPlaceholder
+            font.pixelSize: 10
+            font.weight: Font.DemiBold
+            font.letterSpacing: 0.5
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Repeater {
+                model: wordDetail.wordForms
+                delegate: Rectangle {
+                    radius: 7
+                    color: "#0dffffff"
+                    border.color: DesignTokens.borderSubtle
+                    border.width: 1
+                    implicitWidth: formRow.implicitWidth + 14
+                    height: 24
+
+                    Row {
+                        id: formRow
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Text {
+                            text: modelData.name + ":"
+                            color: DesignTokens.textTertiary
+                            font.pixelSize: 10
+                            font.family: DesignTokens.fontUi
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: modelData.value
+                            color: DesignTokens.textSecondary
+                            font.pixelSize: 10
+                            font.family: DesignTokens.fontUi
+                            font.weight: Font.Medium
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // === 同义词 ===
     ColumnLayout {
+        objectName: "synonymSection"
         Layout.fillWidth: true
+        Layout.alignment: Qt.AlignTop
         spacing: 4
         visible: wordDetail.synonyms.length > 0
 
@@ -423,7 +423,9 @@ ColumnLayout {
 
     // === 反义词 ===
     ColumnLayout {
+        objectName: "antonymSection"
         Layout.fillWidth: true
+        Layout.alignment: Qt.AlignTop
         spacing: 4
         visible: wordDetail.antonyms.length > 0
 
@@ -475,5 +477,6 @@ ColumnLayout {
                 }
             }
         }
+    }
     }
 }

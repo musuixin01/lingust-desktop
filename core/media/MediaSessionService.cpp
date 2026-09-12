@@ -1,172 +1,126 @@
 #include "MediaSessionService.h"
-#include <QDebug>
 
-struct TrackData {
-    QString title;
-    QString artist;
-    QString album;
-    int duration;
-    QVector<LyricEntry> lyrics;
-};
+#include <QtGlobal>
 
-static const QVector<TrackData> s_presets = {
-    {
-        "Lofi Rain & Coffee (咖啡与细雨)",
-        "Lofi Study Beats",
-        "Deep Focus Vol.1",
-        184,
-        {
-            {0, "咖啡香气在雨声中弥漫", "The aroma of coffee diffuses in the rain"},
-            {6, "键盘轻敲，思绪渐入专注", "Light keystrokes, settling into deep focus"},
-            {14, "窗外细雨洗净浮尘，世界安静下来", "Soft rain washing away the world noise"},
-            {24, "每一个生词都是通往世界的桥梁", "Every word is a bridge to the world"},
-            {35, "静心阅读，灵感与释义悄然浮现", "Reading calmly as meanings unfold"},
-            {48, "旋律在耳边缓缓流淌", "Melody flowing softly by your side"},
-            {62, "沉浸在属于自己的心流时光中", "Immersed in your own flow state"}
-        }
-    },
-    {
-        "Midnight Coding Flow (午夜心流)",
-        "Synthwave Ambient",
-        "Night Owl Sessions",
-        210,
-        {
-            {0, "夜幕垂落，屏幕光影轻柔闪烁", "Night falls, the screen glows softly"},
-            {8, "代码与语言在指尖交织起舞", "Code and words dancing at fingertips"},
-            {18, "没有白昼的喧嚣，唯有纯粹的创造", "No daytime noise, only pure creation"},
-            {30, "灵动岛记录着每一个跳动的音符", "Dynamic island capturing every beat"},
-            {45, "跨越语言与文化的边界", "Crossing the boundaries of language"}
-        }
-    },
-    {
-        "Windows 系统媒体总线 (GSMTC 监听模式)",
-        "系统媒体 (网易云/QQ音乐/Spotify/浏览器)",
-        "Windows System Audio Bus",
-        240,
-        {
-            {0, "正在监听 Windows 系统当前活跃媒体播放器", "Monitoring active Windows media player via GSMTC"},
-            {10, "支持网易云音乐、QQ音乐、Spotify、Apple Music与网页音频", "Works with CloudMusic, QQMusic, Spotify, YouTube"},
-            {25, "自动同步歌曲名、歌手、封面与播放状态", "Auto sync title, artist, cover & state"},
-            {45, "在药丸灵动岛上可直接切歌、暂停与查看实时歌词", "Control track, pause, and view lyrics on Island"}
-        }
-    }
-};
+namespace {
+constexpr qint64 kLyricLeadTimeMs = 650;
+}
 
 MediaSessionService::MediaSessionService(QObject *parent)
     : QObject(parent)
 {
-    loadTrack(0);
-
-    connect(&m_tickTimer, &QTimer::timeout, this, &MediaSessionService::onTick);
-    m_tickTimer.setInterval(1000);
+    m_estimatedTimelineTimer.setInterval(1000);
+    connect(&m_estimatedTimelineTimer, &QTimer::timeout, this, [this] {
+        if (!m_isPlaying || m_hasSystemTimeline || m_durationSeconds <= 0)
+            return;
+        m_positionSeconds = qMin(m_positionSeconds + 1, m_durationSeconds);
+        emit positionChanged(m_positionSeconds);
+        updateActiveLyric();
+        if (m_positionSeconds >= m_durationSeconds)
+            m_estimatedTimelineTimer.stop();
+    });
 }
 
-MediaSessionService::~MediaSessionService()
+void MediaSessionService::applySystemSnapshot(bool connected, bool playing,
+                                              const QString &title, const QString &artist,
+                                              const QString &album, const QString &coverDataUrl,
+                                              int durationSeconds,
+                                              int positionSeconds)
 {
-    m_tickTimer.stop();
+    const bool mediaIdentityChanged = m_title != title || m_artist != artist;
+    const bool connectionChanged = m_isSystemMediaConnected != connected;
+    const bool playbackChanged = m_isPlaying != (connected && playing);
+    const bool hasSystemTimeline = durationSeconds > 0;
+    const int effectiveDuration = hasSystemTimeline ? durationSeconds
+                                                     : (mediaIdentityChanged ? 0 : m_durationSeconds);
+    const int boundedPosition = hasSystemTimeline
+        ? qBound(0, positionSeconds, effectiveDuration)
+        : (mediaIdentityChanged ? 0 : m_positionSeconds);
+    const bool trackWasChanged = m_title != title || m_artist != artist ||
+                                 m_album != album || m_coverDataUrl != coverDataUrl ||
+                                 m_durationSeconds != effectiveDuration;
+    const bool positionWasChanged = m_positionSeconds != boundedPosition;
+
+    m_isSystemMediaConnected = connected;
+    m_isPlaying = connected && playing;
+    m_title = connected ? title : QString();
+    m_artist = connected ? artist : QString();
+    m_album = connected ? album : QString();
+    m_coverDataUrl = connected ? coverDataUrl : QString();
+    m_durationSeconds = connected ? qMax(0, effectiveDuration) : 0;
+    m_positionSeconds = connected ? boundedPosition : 0;
+    m_hasSystemTimeline = connected && hasSystemTimeline;
+    if (m_isPlaying && !m_hasSystemTimeline)
+        m_estimatedTimelineTimer.start();
+    else
+        m_estimatedTimelineTimer.stop();
+
+    if (connectionChanged)
+        emit systemMediaStateChanged(m_isSystemMediaConnected);
+    if (playbackChanged)
+        emit playbackStateChanged(m_isPlaying);
+    if (trackWasChanged || connectionChanged)
+        emit trackChanged(m_title, m_artist);
+    if (mediaIdentityChanged || !connected)
+        clearLyrics();
+    if (positionWasChanged || connectionChanged) {
+        emit positionChanged(m_positionSeconds);
+        updateActiveLyric();
+    }
 }
 
-void MediaSessionService::loadTrack(int index)
+QString MediaSessionService::currentLyric() const
 {
-    if (index < 0 || index >= s_presets.size()) return;
-    m_currentTrackIndex = index;
-    const auto &t = s_presets[index];
-    m_title = t.title;
-    m_artist = t.artist;
-    m_album = t.album;
-    m_durationSeconds = t.duration;
-    m_positionSeconds = 0;
-    m_lyrics = t.lyrics;
+    if (m_currentLyricIndex < 0 || m_currentLyricIndex >= m_lyrics.size())
+        return {};
+    return m_lyrics.at(m_currentLyricIndex).toMap().value("text").toString();
+}
 
-    emit trackChanged(m_title, m_artist);
-    emit positionChanged(m_positionSeconds);
+void MediaSessionService::setLyrics(const QVariantList &lines, bool synchronized, int matchedDurationSeconds)
+{
+    m_lyrics = lines;
+    m_lyricsSynchronized = synchronized;
+    m_currentLyricIndex = m_lyrics.isEmpty() ? -1 : 0;
+    if (!m_hasSystemTimeline && m_durationSeconds <= 0 && matchedDurationSeconds > 0) {
+        m_durationSeconds = matchedDurationSeconds;
+        emit trackChanged(m_title, m_artist);
+        if (m_isPlaying)
+            m_estimatedTimelineTimer.start();
+    }
     updateActiveLyric();
+    emit lyricsListChanged();
+    emit lyricChanged(currentLyric(), {});
 }
 
-void MediaSessionService::play()
+void MediaSessionService::clearLyrics()
 {
-    if (!m_isPlaying) {
-        m_isPlaying = true;
-        m_tickTimer.start();
-        emit playbackStateChanged(true);
-    }
-}
-
-void MediaSessionService::pause()
-{
-    if (m_isPlaying) {
-        m_isPlaying = false;
-        m_tickTimer.stop();
-        emit playbackStateChanged(false);
-    }
-}
-
-void MediaSessionService::togglePlay()
-{
-    if (m_isPlaying) {
-        pause();
-    } else {
-        play();
-    }
-}
-
-void MediaSessionService::next()
-{
-    int nextIdx = (m_currentTrackIndex + 1) % s_presets.size();
-    loadTrack(nextIdx);
-    if (m_isPlaying) {
-        m_tickTimer.start();
-    }
-}
-
-void MediaSessionService::previous()
-{
-    int prevIdx = (m_currentTrackIndex - 1 + s_presets.size()) % s_presets.size();
-    loadTrack(prevIdx);
-    if (m_isPlaying) {
-        m_tickTimer.start();
-    }
-}
-
-void MediaSessionService::seek(int seconds)
-{
-    m_positionSeconds = qBound(0, seconds, m_durationSeconds);
-    emit positionChanged(m_positionSeconds);
-    updateActiveLyric();
-}
-
-void MediaSessionService::loadPreset(int index)
-{
-    loadTrack(index);
-}
-
-void MediaSessionService::onTick()
-{
-    m_positionSeconds++;
-    if (m_positionSeconds >= m_durationSeconds) {
-        next();
+    if (m_lyrics.isEmpty() && m_currentLyricIndex == -1)
         return;
-    }
-    emit positionChanged(m_positionSeconds);
-    updateActiveLyric();
+    m_lyrics.clear();
+    m_currentLyricIndex = -1;
+    m_lyricsSynchronized = false;
+    emit lyricsListChanged();
+    emit lyricChanged({}, {});
 }
 
 void MediaSessionService::updateActiveLyric()
 {
-    QString foundText;
-    QString foundTrans;
-    for (const auto &entry : m_lyrics) {
-        if (m_positionSeconds >= entry.timeSeconds) {
-            foundText = entry.text;
-            foundTrans = entry.translation;
-        } else {
-            break;
+    if (m_lyrics.isEmpty())
+        return;
+    int nextIndex = 0;
+    if (m_lyricsSynchronized) {
+        // 视觉先于听觉少量出现，让用户能在演唱开始前读到下一句。
+        const qint64 positionMs = static_cast<qint64>(m_positionSeconds) * 1000
+                                + kLyricLeadTimeMs;
+        for (int index = 0; index < m_lyrics.size(); ++index) {
+            if (m_lyrics.at(index).toMap().value("timeMs").toLongLong() <= positionMs)
+                nextIndex = index;
+            else
+                break;
         }
     }
-
-    if (foundText != m_currentLyric || foundTrans != m_currentLyricTranslation) {
-        m_currentLyric = foundText;
-        m_currentLyricTranslation = foundTrans;
-        emit lyricChanged(m_currentLyric, m_currentLyricTranslation);
+    if (nextIndex != m_currentLyricIndex) {
+        m_currentLyricIndex = nextIndex;
+        emit lyricChanged(currentLyric(), {});
     }
 }

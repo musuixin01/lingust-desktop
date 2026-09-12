@@ -15,7 +15,7 @@ Item {
         text: root.text
         font.pixelSize: root.fontSize
         font.weight: Font.DemiBold
-        font.family: "Segoe UI"
+        font.family: DesignTokens.fontUi
     }
 
     property bool shouldScroll: measurer.implicitWidth > root.width + 4
@@ -44,13 +44,13 @@ Item {
                     color: root.textColor
                     font.pixelSize: root.fontSize
                     font.weight: Font.DemiBold
-                    font.family: "Segoe UI"
+                    font.family: DesignTokens.fontUi
                 }
                 Text {
                     text: "  ✦  "
                     color: "#8034d399"
                     font.pixelSize: root.fontSize - 2
-                    font.family: "Segoe UI"
+                    font.family: DesignTokens.fontUi
                 }
             }
         }

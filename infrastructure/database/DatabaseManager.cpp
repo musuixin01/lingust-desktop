@@ -4,6 +4,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include <QSet>
 
 DatabaseManager::DatabaseManager(QObject *parent)
     : QObject(parent)
@@ -55,6 +56,23 @@ bool DatabaseManager::createTables()
         return false;
     }
 
+    // Additive migration for databases created before screenshot history existed.
+    QSet<QString> historyColumns;
+    if (query.exec("PRAGMA table_info(history)")) {
+        while (query.next())
+            historyColumns.insert(query.value(1).toString());
+    }
+    if (!historyColumns.contains("kind")
+        && !query.exec("ALTER TABLE history ADD COLUMN kind TEXT DEFAULT 'text'")) {
+        qWarning() << "Failed to add history kind:" << query.lastError().text();
+        return false;
+    }
+    if (!historyColumns.contains("preview_url")
+        && !query.exec("ALTER TABLE history ADD COLUMN preview_url TEXT")) {
+        qWarning() << "Failed to add history preview URL:" << query.lastError().text();
+        return false;
+    }
+
     // 收藏表
     QString createFavorites = R"(
         CREATE TABLE IF NOT EXISTS favorites (
@@ -78,16 +96,19 @@ bool DatabaseManager::createTables()
 
 void DatabaseManager::addHistory(const QString &sourceText, const QString &translatedText,
                                   const QString &sourceLang, const QString &targetLang,
-                                  const QString &engine)
+                                  const QString &engine, const QString &kind,
+                                  const QString &previewUrl)
 {
     QSqlQuery query;
-    query.prepare("INSERT INTO history (source_text, translated_text, source_lang, target_lang, engine) "
-                  "VALUES (?, ?, ?, ?, ?)");
+    query.prepare("INSERT INTO history (source_text, translated_text, source_lang, target_lang, engine, kind, preview_url) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?)");
     query.addBindValue(sourceText);
     query.addBindValue(translatedText);
     query.addBindValue(sourceLang);
     query.addBindValue(targetLang);
     query.addBindValue(engine);
+    query.addBindValue(kind);
+    query.addBindValue(previewUrl);
     query.exec();
 }
 
@@ -95,7 +116,7 @@ QVariantList DatabaseManager::getHistory(int limit)
 {
     QVariantList result;
     QSqlQuery query;
-    query.prepare("SELECT id, source_text, translated_text, source_lang, target_lang, engine, timestamp "
+    query.prepare("SELECT id, source_text, translated_text, source_lang, target_lang, engine, timestamp, kind, preview_url "
                   "FROM history ORDER BY timestamp DESC LIMIT ?");
     query.addBindValue(limit);
     query.exec();
@@ -109,6 +130,8 @@ QVariantList DatabaseManager::getHistory(int limit)
         item["targetLang"] = query.value(4).toString();
         item["engine"] = query.value(5).toString();
         item["timestamp"] = query.value(6).toString();
+        item["kind"] = query.value(7).toString().isEmpty() ? "text" : query.value(7).toString();
+        item["previewUrl"] = query.value(8).toString();
         result.append(item);
     }
     return result;

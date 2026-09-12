@@ -1,16 +1,40 @@
 import QtQuick
 import QtQuick.Window
 import QtQuick.Layouts
-import QtQuick.Controls.Basic as Basic
 import Linguist
 
 Item {
     id: root
     anchors.fill: parent
     readonly property string currentMode: translatorWindow.currentMode
-    property color shellColor: "#ee1c202a"
+    property color shellColor: currentMode === "pill" ? "#e6090f1c" : "#e60f172a"
     property real shellOpacity: appState.cardOpacity
+    property real auroraOpacity: currentMode === "card" ? cardView.auroraOpacity : pillView.auroraOpacity
+    property real auroraBloom: currentMode === "card" ? cardView.auroraBloom : pillView.auroraBloom
+    property real auroraPhase: currentMode === "card" ? cardView.auroraPhase : pillView.auroraPhase
     readonly property var stateObject: appState
+    property var settingsPanel: null
+    property var historyPanel: null
+    property var musicPanel: null
+    property var layoutPanel: null
+    property var imagePreviewPanel: null
+    property bool captureStarting: false
+    Behavior on shellColor {
+        ColorAnimation { duration: 140; easing.type: Easing.OutCubic }
+    }
+    function prepareKeyboardFocus(localX, localY) {
+        return root.currentMode === "card"
+            ? cardView.prepareKeyboardFocus(localX, localY)
+            : pillView.prepareKeyboardFocus(localX, localY)
+    }
+    function handlePointerLeave() {
+        if (root.currentMode === "pill") pillView.handlePointerLeave()
+        else cardView.handlePointerLeave()
+    }
+    function handlePointerMove(localX, localY) {
+        if (root.currentMode === "pill") pillView.handlePointerMove(localX, localY)
+        else cardView.handlePointerMove(localX, localY)
+    }
 
     function openPanel(panel) {
         panel.x = Math.max(16, Math.min(translatorWindow.x + 24, panel.screen.width - panel.width - 16))
@@ -19,28 +43,132 @@ Item {
         panel.raise()
         panel.requestActivate()
     }
+    function openSettings() {
+        if (!settingsPanel) settingsPanel = settingsWindowComponent.createObject(null)
+        openPanel(settingsPanel)
+    }
+    function openHistory() {
+        if (!historyPanel) historyPanel = historyWindowComponent.createObject(null)
+        appState.refreshHistory()
+        openPanel(historyPanel)
+    }
+    function openMusic() {
+        if (!musicPanel) musicPanel = musicWindowComponent.createObject(null)
+        openPanel(musicPanel)
+    }
+    function openScreenshotPreview(source) {
+        if (!source || source.length === 0)
+            return
+        if (!imagePreviewPanel)
+            imagePreviewPanel = screenshotPreviewWindowComponent.createObject(null)
+        imagePreviewPanel.imageSource = source
+        openPanel(imagePreviewPanel)
+    }
+    function toggleLayoutPanel() {
+        if (!layoutPanel)
+            layoutPanel = layoutPanelWindowComponent.createObject(null)
+        if (layoutPanel.visible) {
+            layoutPanel.dismiss()
+            return
+        }
+        positionLayoutPanelBelowCard(true)
+        layoutPanel.show()
+        layoutPanel.raise()
+        layoutPanel.requestActivate()
+        Qt.callLater(function() { positionLayoutPanelBelowCard(false) })
+    }
+    function positionLayoutPanelBelowCard(ensureRoom) {
+        if (!layoutPanel)
+            return
+        var activeScreen = layoutPanel.screen || translatorWindow.screen || Qt.application.screens[0]
+        var available = activeScreen.availableGeometry
+        var anchorY = translatorWindow.nativeFrameY + translatorWindow.nativeFrameHeight + 2
+        var neededBottom = anchorY + layoutPanel.height + 10
+        if (ensureRoom && neededBottom > available.y + available.height) {
+            translatorWindow.y = Math.max(available.y + 10,
+                                          translatorWindow.nativeFrameY
+                                          - (neededBottom - available.y - available.height))
+            anchorY = translatorWindow.nativeFrameY + translatorWindow.nativeFrameHeight + 2
+        }
+        var anchorX = translatorWindow.nativeFrameX
+                      + (translatorWindow.nativeFrameWidth - layoutPanel.width) / 2
+        layoutPanel.x = Math.max(available.x + 10,
+                                 Math.min(Math.round(anchorX),
+                                          available.x + available.width - layoutPanel.width - 10))
+        layoutPanel.y = Math.round(anchorY)
+    }
+    function enterPillMusic() {
+        appState.setPillMusicMode(true)
+        translatorWindow.collapseToPill()
+    }
+    function showScreenshotInCard() {
+        translatorWindow.show()
+        translatorWindow.expandToCard()
+        translatorWindow.raise()
+        adaptiveCardHeightTimer.restart()
+    }
+    function beginScreenshotCapture() {
+        if (captureStarting)
+            return
+        captureStarting = true
+        translatorWindow.hide()
+        captureDelay.restart()
+    }
 
     PillView {
+        id: pillView
         anchors.fill: parent
-        visible: root.currentMode === "pill"
+        isResizing: translatorWindow.isResizing
+        visible: true
+        enabled: root.currentMode === "pill"
+        opacity: root.currentMode === "pill" ? 1 : 0
+        z: root.currentMode === "pill" ? 2 : 1
+        Behavior on opacity {
+            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+        }
         onExpandRequested: translatorWindow.expandToCard()
-        onMusicPanelRequested: root.openPanel(musicWindow)
-        onMoreRequested: root.openPanel(actionsWindow)
+        onMinimizeToTaskbarRequested: translatorWindow.minimizeToTaskbar()
+        onMusicPanelRequested: root.openMusic()
+        onSettingsRequested: root.openSettings()
+        onScreenshotRequested: root.beginScreenshotCapture()
     }
     CardView {
+        id: cardView
         anchors.fill: parent
-        visible: root.currentMode === "card"
+        visible: true
+        enabled: root.currentMode === "card"
+        opacity: root.currentMode === "card" ? 1 : 0
+        z: root.currentMode === "card" ? 2 : 1
+        Behavior on opacity {
+            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        }
         isResizing: translatorWindow.isResizing
+        layoutPanelVisible: root.layoutPanel !== null && root.layoutPanel.visible
         onMoveRequested: translatorWindow.startSystemMove()
         onCollapseRequested: translatorWindow.collapseToPill()
         onTranslateRequested: appState.translate()
-        onSettingsRequested: root.openPanel(settingsWindow)
-        onMusicPanelRequested: root.openPanel(musicWindow)
-        onHistoryRequested: { appState.refreshHistory(); root.openPanel(historyWindow) }
-        onScreenshotRequested: root.openPanel(screenshotWindow)
-        onMoreRequested: root.openPanel(actionsWindow)
+        onSettingsRequested: root.openSettings()
+        onMusicPanelRequested: root.enterPillMusic()
+        onHistoryRequested: root.openHistory()
+        onScreenshotRequested: root.beginScreenshotCapture()
+        onScreenshotPreviewRequested: source => root.openScreenshotPreview(source)
         onQuitRequested: Qt.quit()
         onMinimizeToTaskbarRequested: translatorWindow.minimizeToTaskbar()
+        onLayoutPanelRequested: root.toggleLayoutPanel()
+        onDesiredWindowHeightChanged: adaptiveCardHeightTimer.restart()
+        onDesiredWindowWidthChanged: adaptiveCardHeightTimer.restart()
+    }
+
+    Timer {
+        id: adaptiveCardHeightTimer
+        interval: 20
+        repeat: false
+        onTriggered: {
+            if (root.currentMode === "card" && !translatorWindow.isResizing
+                    && !cardView.isMinimal)
+                translatorWindow.adjustSizeToContent(cardView.desiredWindowWidth,
+                                                       cardView.desiredWindowHeight)
+        }
     }
     MouseArea {
         anchors.fill: parent
@@ -49,13 +177,70 @@ Item {
         onPressed: translatorWindow.startSystemMove()
     }
 
+    Timer {
+        id: captureDelay
+        interval: 140
+        repeat: false
+        onTriggered: {
+            root.captureStarting = false
+            if (captureManager.startScreenshotMode()) {
+                captureOverlay.show()
+                captureOverlay.raise()
+                captureOverlay.requestActivate()
+            } else {
+                translatorWindow.show()
+            }
+        }
+    }
+
+    ScreenCaptureOverlay {
+        id: captureOverlay
+        onAccepted: root.showScreenshotInCard()
+        onCancelled: translatorWindow.show()
+    }
+
+    Connections {
+        target: appState
+        function onScreenshotRequested() { root.beginScreenshotCapture() }
+    }
+
+    Connections {
+        target: translatorWindow
+        function onNativeFrameGeometryChanged() { root.positionLayoutPanelBelowCard(false) }
+        function onCurrentModeChanged() {
+            if (translatorWindow.currentMode !== "card" && root.layoutPanel && root.layoutPanel.visible)
+                root.layoutPanel.dismiss()
+        }
+    }
+
+    Connections {
+        target: captureManager
+        function onCaptureFailed(message) {
+            root.captureStarting = false
+            captureOverlay.hide()
+            root.showScreenshotInCard()
+        }
+    }
+
     component UtilityWindow: Window {
         id: utility
         // A tool window must not wait for the invisible offscreen scene.
         transientParent: null
         property Component page
         property bool pageLoaded: false
-        onVisibleChanged: if (visible) pageLoaded = true
+        property bool movable: true
+        function dismiss() {
+            if (!visible || closeMotion.running) return
+            closeMotion.restart()
+        }
+        onVisibleChanged: {
+            if (visible) {
+                pageLoaded = true
+                pageLoader.opacity = 0
+                pageLoader.scale = 0.965
+                Qt.callLater(function() { openMotion.restart() })
+            }
+        }
         width: 440
         height: 580
         minimumWidth: width
@@ -65,143 +250,97 @@ Item {
         visible: false
         color: "transparent"
         flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
-        Loader { anchors.fill: parent; sourceComponent: utility.page; active: utility.pageLoaded }
+        Loader {
+            id: pageLoader
+            anchors.fill: parent
+            sourceComponent: utility.page
+            active: utility.pageLoaded
+            transformOrigin: Item.Center
+        }
+        ParallelAnimation {
+            id: openMotion
+            NumberAnimation { target: pageLoader; property: "opacity"; to: 1; duration: DesignTokens.durationPanelOpen; easing.type: Easing.OutCubic }
+            NumberAnimation { target: pageLoader; property: "scale"; to: 1; duration: DesignTokens.durationPanelOpen; easing.type: Easing.OutBack; easing.overshoot: 0.35 }
+        }
+        SequentialAnimation {
+            id: closeMotion
+            ParallelAnimation {
+                NumberAnimation { target: pageLoader; property: "opacity"; to: 0; duration: DesignTokens.durationPanelClose; easing.type: Easing.InCubic }
+                NumberAnimation { target: pageLoader; property: "scale"; to: 0.98; duration: DesignTokens.durationPanelClose; easing.type: Easing.InCubic }
+            }
+            ScriptAction { script: utility.hide() }
+        }
         MouseArea {
             x: 24; y: 0; width: parent.width - 104; height: 22
+            enabled: utility.movable
             onPressed: utility.startSystemMove()
         }
-        Shortcut { sequence: "Escape"; onActivated: utility.hide() }
+        Shortcut { sequence: "Escape"; onActivated: utility.dismiss() }
     }
-    UtilityWindow {
-        id: settingsWindow
-        title: "Linguist 设置"
-        page: Component { SettingsView { onCloseRequested: settingsWindow.hide() } }
-    }
-    UtilityWindow {
-        id: historyWindow
-        title: "历史与生词本"
-        width: 460
-        height: 560
-        page: Component { HistoryView { onCloseRequested: historyWindow.hide() } }
-    }
-    UtilityWindow {
-        id: musicWindow
-        title: "音乐控制"
-        width: 360
-        height: 360
-        page: Component {
-            MusicIslandCard {
-                appState: root.stateObject
-                onCloseRequested: musicWindow.hide()
-                onSwitchTranslationRequested: { musicWindow.hide(); root.stateObject.setPillMusicMode(false) }
-            }
+    Component {
+        id: settingsWindowComponent
+        UtilityWindow {
+            title: "Linguist 设置"
+            page: Component { SettingsView { onCloseRequested: root.settingsPanel.dismiss() } }
         }
     }
-    UtilityWindow {
-        id: screenshotWindow
-        title: "截图翻译"
-        width: 460
-        height: 540
-        page: Component {
-            Rectangle {
-                color: "#f51c202a"
-                radius: 24
-                border.color: "#40ffffff"
-                ScreenshotTranslationView {
-                    anchors.fill: parent
-                    anchors.margins: 16
-                    onBackToTextRequested: screenshotWindow.hide()
-                    onRetakeRequested: { screenshotWindow.hide(); root.stateObject.triggerSelectionTranslation() }
+    Component {
+        id: historyWindowComponent
+        UtilityWindow {
+            title: "历史与生词本"
+            width: 460
+            height: 560
+            page: Component { HistoryView { onCloseRequested: root.historyPanel.dismiss() } }
+        }
+    }
+    Component {
+        id: musicWindowComponent
+        UtilityWindow {
+            title: "音乐控制"
+            width: 360
+            height: 360
+            page: Component {
+                MusicIslandCard {
+                    appState: root.stateObject
+                    onCloseRequested: root.musicPanel.dismiss()
+                    onSwitchTranslationRequested: { root.musicPanel.dismiss(); root.stateObject.setPillMusicMode(false) }
                 }
             }
         }
     }
-    component ActionButton: Basic.Button {
-        implicitHeight: 36
-        background: Rectangle {
-            radius: 10
-            color: parent.down ? "#33ffffff" : parent.hovered ? "#22ffffff" : "#10ffffff"
-            border.color: parent.activeFocus ? "#60a5fa" : "transparent"
-        }
-        contentItem: Text {
-            text: parent.text
-            color: "#f1f5f9"
-            font.pixelSize: 13
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+    Component {
+        id: layoutPanelWindowComponent
+        UtilityWindow {
+            id: layoutWindow
+            title: "页面排版"
+            width: 212
+            height: 76
+            movable: false
+            Timer {
+                interval: 16
+                repeat: true
+                running: layoutWindow.visible
+                onTriggered: root.positionLayoutPanelBelowCard(false)
+            }
+            page: Component {
+                LayoutScalePanel {
+                    onCloseRequested: root.layoutPanel.dismiss()
+                }
+            }
         }
     }
-    UtilityWindow {
-        id: actionsWindow
-        title: "快捷操作"
-        width: 320
-        height: 520
-        page: Component {
-            Rectangle {
-                radius: 24
-                color: "#f51c202a"
-                border.color: "#40ffffff"
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 20
-                    spacing: 10
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text { text: "快捷操作"; color: "white"; font { pixelSize: 17; weight: Font.DemiBold } Layout.fillWidth: true }
-                        IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/close.svg"; tooltip: "关闭"; onClicked: actionsWindow.hide() }
-                    }
-                    Text { text: "翻译语言"; color: "#bac4d2"; font.pixelSize: 12 }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Basic.ComboBox {
-                            Layout.fillWidth: true
-                            model: ["en", "zh", "ja", "ko", "fr", "de", "es", "ru"]
-                            currentIndex: Math.max(0, model.indexOf(appState.sourceLang))
-                            onActivated: appState.setSourceLang(currentText)
-                        }
-                        IconButton { iconSource: "qrc:/qt/qml/Linguist/resources/icons/swap.svg"; tooltip: "交换语言"; onClicked: appState.swapLanguages() }
-                        Basic.ComboBox {
-                            Layout.fillWidth: true
-                            model: ["zh", "en", "ja", "ko", "fr", "de", "es", "ru"]
-                            currentIndex: Math.max(0, model.indexOf(appState.targetLang))
-                            onActivated: appState.setTargetLang(currentText)
-                        }
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text { text: "翻译引擎"; color: "#bac4d2"; font.pixelSize: 12 }
-                        Basic.ComboBox {
-                            Layout.fillWidth: true
-                            model: ["offline", "gemini", "deepl", "youdao"]
-                            currentIndex: Math.max(0, model.indexOf(appState.engine))
-                            onActivated: appState.setEngine(currentText)
-                        }
-                    }
-                    Text { text: "文字大小  " + appState.fontSizePercent + "%"; color: "#bac4d2"; font.pixelSize: 12 }
-                    Basic.Slider {
-                        Layout.fillWidth: true
-                        from: 70; to: 150; stepSize: 10
-                        value: appState.fontSizePercent
-                        onMoved: appState.setFontSizePercent(Math.round(value))
-                    }
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 2
-                        columnSpacing: 8
-                        rowSpacing: 8
-                        ActionButton { Layout.fillWidth: true; text: "历史与生词本"; onClicked: { actionsWindow.hide(); appState.refreshHistory(); root.openPanel(historyWindow) } }
-                        ActionButton { Layout.fillWidth: true; text: appState.isFavorite ? "取消收藏" : "收藏"; onClicked: appState.setIsFavorite(!appState.isFavorite) }
-                        ActionButton { Layout.fillWidth: true; text: "音乐控制"; onClicked: { actionsWindow.hide(); root.openPanel(musicWindow) } }
-                        ActionButton { Layout.fillWidth: true; text: "截图翻译"; onClicked: { actionsWindow.hide(); appState.triggerSelectionTranslation(); root.openPanel(screenshotWindow) } }
-                        ActionButton { Layout.fillWidth: true; text: appState.isPinned ? "取消置顶" : "置顶"; onClicked: appState.setIsPinned(!appState.isPinned) }
-                        ActionButton { Layout.fillWidth: true; text: "设置"; onClicked: { actionsWindow.hide(); root.openPanel(settingsWindow) } }
-                    }
-                    ActionButton {
-                        Layout.fillWidth: true
-                        text: root.currentMode === "pill" ? "展开翻译卡片" : "收起为药丸"
-                        onClicked: { actionsWindow.hide(); translatorWindow.toggleMode() }
-                    }
-                    Item { Layout.fillHeight: true }
+    Component {
+        id: screenshotPreviewWindowComponent
+        UtilityWindow {
+            id: screenshotPreviewWindow
+            title: "截图原图"
+            width: 680
+            height: 480
+            property string imageSource: ""
+            page: Component {
+                ScreenshotPreview {
+                    sourceUrl: screenshotPreviewWindow.imageSource
+                    onCloseRequested: screenshotPreviewWindow.dismiss()
                 }
             }
         }

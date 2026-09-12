@@ -7,21 +7,28 @@ Rectangle {
     id: historyView
 
     property string searchQuery: ""
-    property string currentFilter: "all" // "all" | "favorites"
+    property string currentFilter: "all" // "all" | "screenshots" | "favorites"
+    readonly property int screenshotCount: {
+        var count = 0
+        var rows = appState ? appState.history : []
+        for (var i = 0; i < rows.length; ++i)
+            if (rows[i].kind === "screenshot") ++count
+        return count
+    }
 
     signal closeRequested()
 
-    radius: DesignTokens.radiusCard
-    color: DesignTokens.bgCardBase
+    radius: DesignTokens.radiusWindow
+    color: DesignTokens.windowSurface
     border.color: DesignTokens.borderNormal
     border.width: 1
     clip: true
 
-    // 毛玻璃磨砂层
     Rectangle {
-        anchors.fill: parent
+        anchors { left: parent.left; right: parent.right; top: parent.top }
+        height: 50
         radius: parent.radius
-        color: DesignTokens.bgCard
+        color: DesignTokens.windowHeader
     }
 
     ColumnLayout {
@@ -45,7 +52,7 @@ Rectangle {
                 color: DesignTokens.textPrimary
                 font.pixelSize: 14
                 font.bold: true
-                font.family: "Segoe UI"
+                font.family: DesignTokens.fontUi
                 Layout.alignment: Qt.AlignVCenter
             }
 
@@ -99,7 +106,7 @@ Rectangle {
                     placeholderText: "搜索历史词汇与短语..."
                     color: DesignTokens.textSecondary
                     font.pixelSize: 12
-                    font.family: "Segoe UI"
+                    font.family: DesignTokens.fontUi
                     background: Rectangle { color: "transparent" }
                     onTextChanged: historyView.searchQuery = text.toLowerCase()
                 }
@@ -161,6 +168,32 @@ Rectangle {
                 Layout.fillWidth: true
                 height: 28
                 radius: 8
+                color: historyView.currentFilter === "screenshots" ? "#3322d3ee" : "#0dffffff"
+                border.color: historyView.currentFilter === "screenshots" ? "#67e8f9" : DesignTokens.borderSubtle
+                border.width: 1
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Image {
+                        anchors.verticalCenter: parent.verticalCenter
+                        source: "qrc:/qt/qml/Linguist/resources/icons/crop.svg"
+                        sourceSize.width: 10; sourceSize.height: 10
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "截图 (" + historyView.screenshotCount + ")"
+                        color: historyView.currentFilter === "screenshots" ? "#ffffff" : DesignTokens.textTertiary
+                        font.pixelSize: 11
+                        font.bold: historyView.currentFilter === "screenshots"
+                    }
+                }
+                TapHandler { onTapped: historyView.currentFilter = "screenshots" }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 28
+                radius: 8
                 color: historyView.currentFilter === "favorites" ? "#33f59e0b" : "#0dffffff"
                 border.color: historyView.currentFilter === "favorites" ? "#fbbf24" : DesignTokens.borderSubtle
                 border.width: 1
@@ -210,6 +243,13 @@ Rectangle {
                         ? (appState ? appState.favorites : [])
                         : (appState ? appState.history : []);
 
+                    if (historyView.currentFilter === "screenshots") {
+                        var screenshots = [];
+                        for (var j = 0; j < sourceList.length; ++j)
+                            if (sourceList[j].kind === "screenshot") screenshots.push(sourceList[j]);
+                        sourceList = screenshots;
+                    }
+
                     if (!historyView.searchQuery) return sourceList;
 
                     var q = historyView.searchQuery;
@@ -251,9 +291,26 @@ Rectangle {
                                 color: DesignTokens.textPrimary
                                 font.bold: true
                                 font.pixelSize: 12
-                                font.family: "Segoe UI"
+                                font.family: DesignTokens.fontUi
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
+                            }
+
+                            Rectangle {
+                                visible: modelData.kind === "screenshot"
+                                radius: 4
+                                color: "#2022d3ee"
+                                border.color: "#4067e8f9"
+                                implicitWidth: shotLabel.implicitWidth + 8
+                                height: 16
+                                Text {
+                                    id: shotLabel
+                                    anchors.centerIn: parent
+                                    text: "截图"
+                                    color: "#a5f3fc"
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                }
                             }
 
                             // 语言标签
@@ -328,7 +385,7 @@ Rectangle {
                             text: modelData.translatedText || ""
                             color: "#93c5fd"
                             font.pixelSize: 11
-                            font.family: "Segoe UI"
+                            font.family: DesignTokens.fontUi
                             wrapMode: Text.Wrap
                             elide: Text.ElideRight
                             maximumLineCount: 2
@@ -342,8 +399,7 @@ Rectangle {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (appState && modelData.sourceText) {
-                                appState.setSourceText(modelData.sourceText);
-                                appState.translate();
+                                appState.openHistoryItem(modelData);
                                 historyView.closeRequested();
                             }
                         }

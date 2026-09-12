@@ -9,17 +9,36 @@
 #include <QFileInfo>
 #include <QCoreApplication>
 #include <QDir>
+#include <QRegularExpression>
+#include <QSet>
+
+namespace {
+QString normalizedLanguageCode(QString language, bool allowAuto)
+{
+    language = language.trimmed().toLower();
+    if (language == "zh-chs" || language == "zh-cn" || language == "zh-hans")
+        language = "zh";
+    if (language == "zh-cht" || language == "zh-tw" || language == "zh-hant")
+        language = "zh-tw";
+    static const QSet<QString> supported = {
+        "zh", "zh-tw", "en", "ja", "ko", "fr", "de", "es", "pt",
+        "it", "ru", "ar", "vi", "th"
+    };
+    if (allowAuto && language == "auto") return language;
+    return supported.contains(language) ? language : QString();
+}
+}
 
 AppState::AppState(QObject *parent)
     : QObject(parent)
-    , m_sourceText("Efficient")
-    , m_translatedText("高效的")
+    , m_sourceText()
+    , m_translatedText()
     , m_sourceLang("en")
     , m_targetLang("zh")
     , m_isTranslating(false)
-    , m_isWord(true)
-    , m_phoneticUs("/ɪˈfɪʃnt/")
-    , m_phoneticUk("/ɪˈfɪʃ(ə)nt/")
+    , m_isWord(false)
+    , m_phoneticUs()
+    , m_phoneticUk()
     , m_isFavorite(false)
     , m_engine("gemini")
     , m_justCopied(false)
@@ -31,21 +50,22 @@ AppState::AppState(QObject *parent)
     , m_cardOpacity(0.95)
     , m_fontSizePercent(100)
     , m_translationManager(new TranslationManager(this))
+    , m_ocrTranslationManager(new TranslationManager(this))
     , m_offlineDict(new OfflineDictionary(this))
     , m_database(new DatabaseManager(this))
     , m_selectionManager(new SelectionManager(this))
     , m_mediaSession(new MediaSessionService(this))
+    , m_lyricsProvider(new LrclibLyricsProvider(this))
     , m_pillMusicMode(false)
 {
-    m_definitions = {
-        QVariantMap{{"partOfSpeech", "adj."}, {"meaning", "高效的；效率高的"}}
-    };
-    // 例句和同义词默认留空，由翻译引擎填充
-
     connect(m_translationManager, &TranslationManager::translationReady,
             this, &AppState::onTranslationReady);
     connect(m_translationManager, &TranslationManager::translationError,
             this, &AppState::onTranslationError);
+    connect(m_ocrTranslationManager, &TranslationManager::translationReady,
+            this, &AppState::onOcrLineTranslationReady);
+    connect(m_ocrTranslationManager, &TranslationManager::translationError,
+            this, &AppState::onOcrLineTranslationError);
 
     connect(m_mediaSession, &MediaSessionService::playbackStateChanged,
             this, &AppState::musicPlayingChanged);
@@ -55,6 +75,22 @@ AppState::AppState(QObject *parent)
             this, &AppState::musicPositionChanged);
     connect(m_mediaSession, &MediaSessionService::lyricChanged,
             this, &AppState::musicLyricChanged);
+    connect(m_mediaSession, &MediaSessionService::lyricsListChanged,
+            this, &AppState::musicLyricsChanged);
+    connect(m_mediaSession, &MediaSessionService::systemMediaStateChanged,
+            this, &AppState::systemMediaConnectedChanged);
+    connect(m_mediaSession, &MediaSessionService::trackChanged, this,
+            [this](const QString &title, const QString &artist) {
+        if (!title.isEmpty() && !artist.isEmpty()) {
+            m_lyricsProvider->requestLyrics(title, artist, trackAlbum(), trackDuration());
+        }
+    });
+    connect(m_lyricsProvider, &ILyricsProvider::lyricsReady, this,
+            [this](const QString &title, const QString &artist,
+                   const QVariantList &lines, bool synchronized, int durationSeconds) {
+        if (title == trackTitle() && artist == trackArtist())
+            m_mediaSession->setLyrics(lines, synchronized, durationSeconds);
+    });
 
     m_copyTimer.setSingleShot(true);
     m_copyTimer.setInterval(1200);
@@ -99,9 +135,9 @@ AppState::AppState(QObject *parent)
     }
 
     connect(m_selectionManager, &SelectionManager::textSelected, this, [this](const QString &text) {
-        if (!text.isEmpty()) {
-            m_sourceText = text;
-            emit sourceTextChanged();
+        const QString selected = text.trimmed();
+        if (!selected.isEmpty()) {
+            setSourceText(selected);
             translate();
         }
     });
@@ -110,6 +146,10 @@ AppState::AppState(QObject *parent)
 QString AppState::sourceText() const { return m_sourceText; }
 void AppState::setSourceText(const QString &text)
 {
+    if (text.trimmed().isEmpty()) {
+        clearText();
+        return;
+    }
     if (m_sourceText == text) return;
     m_sourceText = text;
     emit sourceTextChanged();
@@ -119,17 +159,33 @@ QString AppState::translatedText() const { return m_translatedText; }
 QString AppState::sourceLang() const { return m_sourceLang; }
 void AppState::setSourceLang(const QString &lang)
 {
-    if (m_sourceLang == lang) return;
-    m_sourceLang = lang;
+    const QString normalized = normalizedLanguageCode(lang, true);
+    if (normalized.isEmpty() || m_sourceLang == normalized) return;
+    const QString previousSource = m_sourceLang;
+    m_sourceLang = normalized;
     emit sourceLangChanged();
+    if (normalized != "auto" && normalized == m_targetLang) {
+        m_targetLang = previousSource != "auto" && previousSource != normalized
+                           ? previousSource : (normalized.startsWith("zh") ? "en" : "zh");
+        emit targetLangChanged();
+    }
+    if (!m_sourceText.trimmed().isEmpty() && !m_screenshotMode) translate();
 }
 
 QString AppState::targetLang() const { return m_targetLang; }
 void AppState::setTargetLang(const QString &lang)
 {
-    if (m_targetLang == lang) return;
-    m_targetLang = lang;
+    const QString normalized = normalizedLanguageCode(lang, false);
+    if (normalized.isEmpty() || m_targetLang == normalized) return;
+    const QString previousTarget = m_targetLang;
+    m_targetLang = normalized;
     emit targetLangChanged();
+    if (m_sourceLang != "auto" && normalized == m_sourceLang) {
+        m_sourceLang = previousTarget != normalized
+                           ? previousTarget : (normalized.startsWith("zh") ? "en" : "zh");
+        emit sourceLangChanged();
+    }
+    if (!m_sourceText.trimmed().isEmpty() && !m_screenshotMode) translate();
 }
 
 bool AppState::isTranslating() const { return m_isTranslating; }
@@ -150,6 +206,7 @@ void AppState::setEngine(const QString &e)
     if (m_engine == e) return;
     m_engine = e;
     m_translationManager->setEngine(e);
+    m_ocrTranslationManager->setEngine(e);
     emit engineChanged();
 }
 
@@ -217,7 +274,23 @@ void AppState::resetFontSize()
 
 void AppState::clearText()
 {
-    setSourceText("");
+    ++m_translationRevision;
+    const bool sourceChanged = !m_sourceText.isEmpty();
+    m_sourceText.clear();
+    if (sourceChanged) emit sourceTextChanged();
+
+    m_pendingResult.clear();
+    m_pendingError.clear();
+    if (m_isTranslating) {
+        m_isTranslating = false;
+        emit isTranslatingChanged();
+    }
+    clearResult();
+    if (!m_errorMessage.isEmpty()) {
+        m_errorMessage.clear();
+        emit errorMessageChanged();
+    }
+    emit textCleared();
 }
 
 QVariantList AppState::definitions() const { return m_definitions; }
@@ -233,6 +306,10 @@ QVariantList AppState::favorites() const { return m_favorites; }
 void AppState::translate()
 {
     if (m_sourceText.trimmed().isEmpty()) return;
+
+    const quint64 revision = ++m_translationRevision;
+    m_pendingResult.clear();
+    m_pendingError.clear();
 
     m_isTranslating = true;
     emit isTranslatingChanged();
@@ -271,7 +348,8 @@ void AppState::translate()
 
                 qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_translateStartTime;
                 if (elapsed < 300) {
-                    QTimer::singleShot(300 - elapsed, this, [this, result]() {
+                    QTimer::singleShot(300 - elapsed, this, [this, result, revision]() {
+                        if (revision != m_translationRevision) return;
                         m_pendingResult = result;
                         applyPendingResult();
                     });
@@ -288,53 +366,19 @@ void AppState::translate()
         result["isWord"] = false;
         result["engine"] = "offline";
         m_pendingResult = result;
-        QTimer::singleShot(300, this, &AppState::applyPendingResult);
+        QTimer::singleShot(300, this, [this, revision] {
+            if (revision == m_translationRevision) applyPendingResult();
+        });
         return;
     }
 
-    // 在线引擎：优先查离线词库（仅英文单词）
-    if (m_offlineDict->isAvailable() && m_sourceLang == "en") {
-        QVariantMap dictResult = m_offlineDict->lookup(m_sourceText);
-        if (dictResult.value("found", false).toBool()) {
-            // 离线词库命中，构造完整结果
-            QVariantMap result;
-            result["translatedText"] = dictResult.value("briefTranslation").toString();
-            result["isWord"] = true;
-            result["phonetic"] = QVariantMap{
-                {"us", dictResult.value("phonetic").toString()},
-                {"uk", dictResult.value("phonetic").toString()}
-            };
-            result["definitions"] = dictResult.value("definitions").toList();
-            result["wordForms"] = dictResult.value("wordForms").toList();
-            result["englishDefinition"] = dictResult.value("englishDefinition").toString();
-            result["tags"] = dictResult.value("tags").toList();
-            result["collins"] = dictResult.value("collins").toInt();
-            result["oxford"] = dictResult.value("oxford").toInt();
-            result["examples"] = QVariantList();
-            result["synonyms"] = QVariantList();
-            result["antonyms"] = QVariantList();
-            result["engine"] = "offline-dict";
-
-            qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_translateStartTime;
-            if (elapsed < 300) {
-                QTimer::singleShot(300 - elapsed, this, [this, result]() {
-                    m_pendingResult = result;
-                    applyPendingResult();
-                });
-            } else {
-                m_pendingResult = result;
-                applyPendingResult();
-            }
-            return;
-        }
-    }
-
-    // 离线词库未命中，走在线翻译
+    // 在线引擎负责生成完整词典结果；本地 ECDICT 在结果返回后补足中文释义。
     m_translationManager->translate(m_sourceText, m_sourceLang, m_targetLang);
 }
 
 void AppState::onTranslationReady(const QVariantMap &result)
 {
+    if (m_sourceText.trimmed().isEmpty()) return;
     m_pendingResult = result;
     m_pendingError.clear();
 
@@ -344,7 +388,10 @@ void AppState::onTranslationReady(const QVariantMap &result)
     if (elapsed >= minLoadTime) {
         applyPendingResult();
     } else {
-        QTimer::singleShot(minLoadTime - elapsed, this, &AppState::applyPendingResult);
+        const quint64 revision = m_translationRevision;
+        QTimer::singleShot(minLoadTime - elapsed, this, [this, revision] {
+            if (revision == m_translationRevision) applyPendingResult();
+        });
     }
 }
 
@@ -366,6 +413,35 @@ void AppState::applyPendingResult()
 
     QVariantMap result = m_pendingResult;
     m_pendingResult.clear();
+
+    // 在线兜底保留例句和同反义词，本地词库补齐稳定的中文释义、词形与标签。
+    if (m_sourceLang == "en" && m_targetLang.startsWith("zh") && m_offlineDict->isAvailable()) {
+        const QVariantMap local = m_offlineDict->lookup(m_sourceText);
+        if (local.value("found", false).toBool()) {
+            const QString resultEngine = result.value("engine").toString();
+            const bool fallbackResult = resultEngine == "fallback" || resultEngine == "offline";
+            result["isWord"] = true;
+            if (result.value("translatedText").toString().trimmed().isEmpty()
+                || result.value("translatedText").toString().trimmed().compare(
+                    m_sourceText.trimmed(), Qt::CaseInsensitive) == 0) {
+                result["translatedText"] = local.value("briefTranslation");
+            }
+            if (fallbackResult || result.value("definitions").toList().isEmpty())
+                result["definitions"] = local.value("definitions");
+
+            QVariantMap phonetic = result.value("phonetic").toMap();
+            const QString localPhonetic = local.value("phonetic").toString();
+            if (phonetic.value("us").toString().isEmpty()) phonetic["us"] = localPhonetic;
+            if (phonetic.value("uk").toString().isEmpty()) phonetic["uk"] = localPhonetic;
+            result["phonetic"] = phonetic;
+
+            if (result.value("wordForms").toList().isEmpty())
+                result["wordForms"] = local.value("wordForms");
+            if (result.value("tags").toList().isEmpty()) result["tags"] = local.value("tags");
+            if (result.value("englishDefinition").toString().isEmpty())
+                result["englishDefinition"] = local.value("englishDefinition");
+        }
+    }
 
     m_translatedText = result.value("translatedText").toString();
     m_isWord = result.value("isWord", false).toBool();
@@ -440,6 +516,7 @@ void AppState::applyPendingResult()
 
 void AppState::onTranslationError(const QString &error)
 {
+    if (m_sourceText.trimmed().isEmpty()) return;
     m_pendingError = error;
     m_pendingResult.clear();
 
@@ -449,7 +526,10 @@ void AppState::onTranslationError(const QString &error)
     if (elapsed >= minLoadTime) {
         applyPendingResult();
     } else {
-        QTimer::singleShot(minLoadTime - elapsed, this, &AppState::applyPendingResult);
+        const quint64 revision = m_translationRevision;
+        QTimer::singleShot(minLoadTime - elapsed, this, [this, revision] {
+            if (revision == m_translationRevision) applyPendingResult();
+        });
     }
 }
 
@@ -481,11 +561,20 @@ void AppState::clearResult()
 
 void AppState::swapLanguages()
 {
+    if (m_sourceLang == "auto") {
+        m_sourceLang = m_targetLang;
+        m_targetLang = m_sourceLang.startsWith("zh") ? "en" : "zh";
+        emit sourceLangChanged();
+        emit targetLangChanged();
+        if (!m_sourceText.trimmed().isEmpty() && !m_screenshotMode) translate();
+        return;
+    }
     QString tmp = m_sourceLang;
     m_sourceLang = m_targetLang;
     m_targetLang = tmp;
     emit sourceLangChanged();
     emit targetLangChanged();
+    if (!m_sourceText.trimmed().isEmpty() && !m_screenshotMode) translate();
 }
 
 void AppState::copyTranslation()
@@ -560,11 +649,13 @@ void AppState::speak(const QString &text, const QString &lang, const QString &ac
 void AppState::setApiKey(const QString &engine, const QString &key)
 {
     m_translationManager->setApiKey(engine, key);
+    m_ocrTranslationManager->setApiKey(engine, key);
 }
 
 void AppState::setApiSecret(const QString &engine, const QString &secret)
 {
     m_translationManager->setApiSecret(engine, secret);
+    m_ocrTranslationManager->setApiSecret(engine, secret);
 }
 
 void AppState::toggleFavorite()
@@ -616,6 +707,33 @@ void AppState::refreshHistory()
     emit historyChanged();
 }
 
+void AppState::openHistoryItem(const QVariantMap &item)
+{
+    const QString source = item.value("sourceText").toString();
+    if (item.value("kind").toString() != QStringLiteral("screenshot")) {
+        exitScreenshotMode();
+        setSourceText(source);
+        translate();
+        return;
+    }
+
+    const QString translated = item.value("translatedText").toString();
+    m_screenshotMode = true;
+    m_ocrImagePreview = item.value("previewUrl").toString();
+    m_ocrOriginalText = source;
+    m_ocrSourceLines = source.split('\n', Qt::SkipEmptyParts);
+    m_ocrTranslatedLines = translated.split('\n', Qt::KeepEmptyParts);
+    m_ocrLines.clear();
+    for (qsizetype i = 0; i < m_ocrSourceLines.size(); ++i) {
+        const QString destination = i < m_ocrTranslatedLines.size()
+            ? m_ocrTranslatedLines.at(i) : QString();
+        m_ocrLines.append(QVariantMap{{"src", m_ocrSourceLines.at(i)}, {"dst", destination}});
+    }
+    m_isOcrProcessing = false;
+    m_ocrStatus = QStringLiteral("截图翻译历史");
+    emit ocrStateChanged();
+}
+
 void AppState::refreshFavorites()
 {
     m_favorites = m_database->getFavorites();
@@ -626,6 +744,125 @@ void AppState::triggerSelectionTranslation()
 {
     m_selectionManager->setEnabled(m_selectionTranslation);
     m_selectionManager->triggerSelectionTranslation();
+}
+
+void AppState::requestScreenshot()
+{
+    emit screenshotRequested();
+}
+
+void AppState::exitScreenshotMode()
+{
+    if (!m_screenshotMode)
+        return;
+    m_screenshotMode = false;
+    emit ocrStateChanged();
+}
+
+void AppState::beginScreenshotTranslation(const QString &previewUrl)
+{
+    m_screenshotMode = true;
+    m_ocrImagePreview = previewUrl;
+    m_ocrOriginalText.clear();
+    m_ocrSourceLines.clear();
+    m_ocrTranslatedLines.clear();
+    m_ocrLineIndex = 0;
+    m_ocrLines.clear();
+    m_ocrStatus = QStringLiteral("正在识别截图文字…");
+    m_isOcrProcessing = true;
+    emit ocrStateChanged();
+}
+
+void AppState::submitOcrText(const QString &text)
+{
+    const QString normalized = text.trimmed();
+    if (normalized.isEmpty()) {
+        setOcrError(QStringLiteral("选区中没有识别到文字"));
+        return;
+    }
+
+    m_ocrOriginalText = normalized;
+    m_ocrSourceLines = normalized.split(
+        QRegularExpression(QStringLiteral("[\\r\\n]+")), Qt::SkipEmptyParts);
+    for (QString &line : m_ocrSourceLines)
+        line = line.trimmed();
+    m_ocrTranslatedLines = QStringList(m_ocrSourceLines.size(), QString());
+    m_ocrLineIndex = 0;
+    m_ocrLines.clear();
+    for (const QString &line : m_ocrSourceLines)
+        m_ocrLines.append(QVariantMap{{"src", line}, {"dst", QString()}});
+    m_ocrStatus = QStringLiteral("正在翻译第 1/%1 行…").arg(m_ocrSourceLines.size());
+    emit ocrStateChanged();
+
+    translateNextOcrLine();
+}
+
+void AppState::setOcrError(const QString &message)
+{
+    m_screenshotMode = true;
+    m_ocrLines.clear();
+    m_ocrSourceLines.clear();
+    m_ocrTranslatedLines.clear();
+    m_isOcrProcessing = false;
+    m_ocrLineIndex = 0;
+    m_ocrStatus = message.trimmed().isEmpty() ? QStringLiteral("截图翻译失败") : message;
+    emit ocrStateChanged();
+}
+
+void AppState::translateNextOcrLine()
+{
+    if (m_ocrLineIndex >= m_ocrSourceLines.size()) {
+        finishOcrLineTranslation();
+        return;
+    }
+    m_ocrStatus = QStringLiteral("正在翻译第 %1/%2 行…")
+        .arg(m_ocrLineIndex + 1)
+        .arg(m_ocrSourceLines.size());
+    emit ocrStateChanged();
+    m_ocrTranslationManager->translate(m_ocrSourceLines.at(m_ocrLineIndex),
+                                       m_sourceLang, m_targetLang);
+}
+
+void AppState::onOcrLineTranslationReady(const QVariantMap &result)
+{
+    if (m_ocrLineIndex < 0 || m_ocrLineIndex >= m_ocrSourceLines.size())
+        return;
+    QString translated = result.value("translatedText").toString().trimmed();
+    if (translated.isEmpty())
+        translated = m_ocrSourceLines.at(m_ocrLineIndex);
+    m_ocrTranslatedLines[m_ocrLineIndex] = translated;
+    m_ocrLines[m_ocrLineIndex] = QVariantMap{{"src", m_ocrSourceLines.at(m_ocrLineIndex)},
+                                             {"dst", translated}};
+    ++m_ocrLineIndex;
+    emit ocrStateChanged();
+    QTimer::singleShot(0, this, &AppState::translateNextOcrLine);
+}
+
+void AppState::onOcrLineTranslationError(const QString &error)
+{
+    Q_UNUSED(error)
+    if (m_ocrLineIndex < 0 || m_ocrLineIndex >= m_ocrSourceLines.size())
+        return;
+    const QString unavailable = QStringLiteral("此行暂时无法翻译");
+    m_ocrTranslatedLines[m_ocrLineIndex] = unavailable;
+    m_ocrLines[m_ocrLineIndex] = QVariantMap{{"src", m_ocrSourceLines.at(m_ocrLineIndex)},
+                                             {"dst", unavailable}};
+    ++m_ocrLineIndex;
+    emit ocrStateChanged();
+    QTimer::singleShot(0, this, &AppState::translateNextOcrLine);
+}
+
+void AppState::finishOcrLineTranslation()
+{
+    m_isOcrProcessing = false;
+    m_ocrStatus = QStringLiteral("截图翻译完成");
+    const QString translatedText = m_ocrTranslatedLines.join('\n');
+    m_database->addHistory(m_ocrOriginalText, translatedText,
+                           m_sourceLang, m_targetLang, m_engine,
+                           QStringLiteral("screenshot"), m_ocrImagePreview);
+    m_history = m_database->getHistory();
+    emit historyChanged();
+    emit ocrStateChanged();
 }
 
 void AppState::clearError()
@@ -711,6 +948,43 @@ QString AppState::currentLyricTranslation() const
     return m_mediaSession ? m_mediaSession->currentLyricTranslation() : QString();
 }
 
+QString AppState::coverArtUrl() const
+{
+    return m_mediaSession ? m_mediaSession->coverDataUrl() : QString();
+}
+
+QVariantList AppState::musicLyrics() const
+{
+    return m_mediaSession ? m_mediaSession->lyrics() : QVariantList();
+}
+
+int AppState::currentLyricIndex() const
+{
+    return m_mediaSession ? m_mediaSession->currentLyricIndex() : -1;
+}
+
+bool AppState::lyricsSynchronized() const
+{
+    return m_mediaSession && m_mediaSession->lyricsSynchronized();
+}
+
+bool AppState::systemMediaConnected() const
+{
+    return m_mediaSession && m_mediaSession->isSystemMediaConnected();
+}
+
+void AppState::updateSystemMediaSession(bool connected, bool playing,
+                                        const QString &title, const QString &artist,
+                                        const QString &album, const QString &coverDataUrl,
+                                        int durationSeconds,
+                                        int positionSeconds)
+{
+    if (m_mediaSession) {
+        m_mediaSession->applySystemSnapshot(connected, playing, title, artist, album, coverDataUrl,
+                                            durationSeconds, positionSeconds);
+    }
+}
+
 void AppState::setPillMusicMode(bool enabled)
 {
     if (m_pillMusicMode != enabled) {
@@ -726,29 +1000,20 @@ void AppState::togglePillMusicMode()
 
 void AppState::toggleMusicPlay()
 {
-    if (m_mediaSession) {
-        m_mediaSession->togglePlay();
-    }
+    emit musicToggleRequested();
 }
 
 void AppState::nextTrack()
 {
-    if (m_mediaSession) {
-        m_mediaSession->next();
-    }
+    emit musicNextRequested();
 }
 
 void AppState::prevTrack()
 {
-    if (m_mediaSession) {
-        m_mediaSession->previous();
-    }
+    emit musicPreviousRequested();
 }
 
 void AppState::seekTrack(int seconds)
 {
-    if (m_mediaSession) {
-        m_mediaSession->seek(seconds);
-    }
+    emit musicSeekRequested(seconds);
 }
-

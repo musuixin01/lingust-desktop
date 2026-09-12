@@ -9,6 +9,10 @@ class TranslatorWindow;
 class TrayManager;
 class HotkeyManager;
 class MouseHookManager;
+class WindowsMediaManager;
+class CaptureManager;
+class OcrManager;
+class WindowsOcrProvider;
 
 class Application : public QObject
 {
@@ -26,4 +30,8 @@ private:
     std::unique_ptr<TrayManager> m_tray;
     std::unique_ptr<HotkeyManager> m_hotkey;
     std::unique_ptr<MouseHookManager> m_mouseHook;
+    std::unique_ptr<WindowsMediaManager> m_windowsMedia;
+    std::unique_ptr<CaptureManager> m_captureManager;
+    std::unique_ptr<OcrManager> m_ocrManager;
+    std::unique_ptr<WindowsOcrProvider> m_windowsOcr;
 };

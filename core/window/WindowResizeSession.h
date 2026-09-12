@@ -9,8 +9,14 @@
 
 struct WindowSurface {
     bool pill = false;
+    int cornerRadius = 0;
     QColor color = QColor(28, 32, 42, 238);
     qreal opacity = 1.0;
+    qreal auroraOpacity = 0.0;
+    qreal auroraBloom = 0.0;
+    qreal auroraPhase = 0.0;
+    int resizeEdges = 0;
+    bool resizing = false;
 };
 
 class QWindow;
@@ -32,6 +38,7 @@ public:
     virtual QPointF pointerPosition(QWindow *window) const = 0;
     virtual Qt::Edges hitTest(QWindow *window) const = 0;
     virtual bool begin(QWindow *window, Qt::Edges edges) = 0;
+    virtual bool minimize(QWindow *window) = 0;
     virtual QRect targetGeometry(QWindow *window) const = 0;
     virtual bool present(QWindow *window, const QImage &frame, const QRect &nativeGeometry,
                          const WindowSurface &surface) = 0;

@@ -6,10 +6,12 @@ Item {
     property color textColor: DesignTokens.textSecondary
     property int fontSize: DesignTokens.fontSizeSm
     property real speed: 35
-    property bool hovered: hoverObserver.hovered
+    property bool interactionEnabled: true
+    property bool hovered: interactionEnabled && hoverObserver.hovered
     property string prefix: ""
     property color prefixColor: DesignTokens.accentBlueDim
-    readonly property bool stacked: prefix.length > 0 && width < 260 && height >= fontSize * 2 + 8
+    property bool allowStacking: true
+    readonly property bool stacked: allowStacking && prefix.length > 0 && width < 260 && height >= fontSize * 2 + 8
     readonly property bool isOverflow: scrollText.implicitWidth > textViewport.width
     readonly property real overflowDistance: Math.max(0, scrollText.implicitWidth - textViewport.width)
     readonly property real scrollDuration: overflowDistance / Math.max(1, speed)
@@ -25,7 +27,7 @@ Item {
         text: root.prefix
         color: root.prefixColor
         font.pixelSize: root.fontSize - 1
-        font.family: "Consolas"
+        font.family: DesignTokens.fontMono
         elide: Text.ElideRight
     }
     Item {
@@ -43,7 +45,7 @@ Item {
             text: root.text
             color: root.textColor
             font.pixelSize: root.fontSize
-            font.family: "Segoe UI"
+            font.family: DesignTokens.fontUi
             font.weight: root.textColor === DesignTokens.textPrimary ? Font.DemiBold : Font.Normal
         }
     }

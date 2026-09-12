@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName("Linguist");
     QApplication::setOrganizationName("Linguist");
     QApplication::setApplicationDisplayName("Linguist 桌面悬浮翻译");
+    QApplication::setApplicationVersion("0.1.0");
     QApplication::setQuitOnLastWindowClosed(false);
 
     Application application;

@@ -18,5 +18,6 @@ private slots:
 
 private:
     QNetworkAccessManager *m_network;
+    quint64 m_requestId = 0;
     QString generateSign(const QString &text, const QString &salt, const QString &curtime);
 };

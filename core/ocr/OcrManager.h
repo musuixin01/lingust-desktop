@@ -11,7 +11,7 @@ class OcrManager : public QObject
 public:
     explicit OcrManager(QObject *parent = nullptr);
 
-    Q_INVOKABLE void recognize(const QImage &image);
+    Q_INVOKABLE void recognize(const QImage &image, const QString &language = QString());
     void setProvider(IOcrProvider *provider);
 
 signals:

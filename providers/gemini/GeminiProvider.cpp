@@ -14,14 +14,15 @@ QString GeminiProvider::buildPrompt(const QString &text, const QString &sourceLa
 {
     return QString(
         "你是一个专业翻译引擎。请将以下%1文本翻译成%2。\n"
-        "如果是单词，请额外提供：音标(美音/英音)、词性释义、2个双语例句、3个同义词。\n"
-        "输出严格为JSON格式：{\"translatedText\":\"...\",\"isWord\":true/false,\"phonetic\":{\"us\":\"...\",\"uk\":\"...\"},\"definitions\":[{\"partOfSpeech\":\"...\",\"meaning\":\"...\"}],\"examples\":[{\"src\":\"...\",\"dst\":\"...\"}],\"synonyms\":[\"...\"]}\n\n"
+        "如果是单词，请额外提供：音标(美音/英音)、词性释义、2个双语例句、最多5个同义词和5个反义词。\n"
+        "输出严格为JSON格式：{\"translatedText\":\"...\",\"isWord\":true/false,\"phonetic\":{\"us\":\"...\",\"uk\":\"...\"},\"definitions\":[{\"partOfSpeech\":\"...\",\"meaning\":\"...\"}],\"examples\":[{\"src\":\"...\",\"dst\":\"...\"}],\"synonyms\":[\"...\"],\"antonyms\":[\"...\"]}\n\n"
         "原文：%3"
     ).arg(sourceLang, targetLang, text);
 }
 
 void GeminiProvider::translate(const QString &text, const QString &sourceLang, const QString &targetLang)
 {
+    const quint64 requestId = ++m_requestId;
     if (m_apiKey.isEmpty()) {
         emit translationError("Gemini API Key 未配置");
         return;
@@ -55,6 +56,7 @@ void GeminiProvider::translate(const QString &text, const QString &sourceLang, c
 
     QByteArray body = QJsonDocument(root).toJson();
     QNetworkReply *reply = m_network->post(request, body);
+    reply->setProperty("requestId", QVariant::fromValue<qulonglong>(requestId));
     connect(reply, &QNetworkReply::finished, this, &GeminiProvider::onReplyFinished);
 }
 
@@ -62,6 +64,11 @@ void GeminiProvider::onReplyFinished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
+    const bool current = reply->property("requestId").toULongLong() == m_requestId;
+    if (!current) {
+        reply->deleteLater();
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         emit translationError(QString("网络错误: %1").arg(reply->errorString()));

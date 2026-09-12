@@ -18,6 +18,7 @@ private slots:
 
 private:
     QNetworkAccessManager *m_network;
+    quint64 m_requestId = 0;
     QString buildPrompt(const QString &text, const QString &sourceLang, const QString &targetLang);
     QVariantMap parseResponse(const QByteArray &data);
 };

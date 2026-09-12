@@ -7,6 +7,16 @@
 #include <QDateTime>
 #include <QRandomGenerator>
 
+namespace {
+QString youdaoLanguage(QString language)
+{
+    language = language.trimmed().toLower();
+    if (language == "zh" || language == "zh-cn" || language == "zh-hans") return "zh-CHS";
+    if (language == "zh-tw" || language == "zh-hant") return "zh-CHT";
+    return language;
+}
+}
+
 YoudaoProvider::YoudaoProvider(QObject *parent)
     : ITranslationProvider(parent)
     , m_network(new QNetworkAccessManager(this))
@@ -31,6 +41,7 @@ QString YoudaoProvider::generateSign(const QString &text, const QString &salt, c
 
 void YoudaoProvider::translate(const QString &text, const QString &sourceLang, const QString &targetLang)
 {
+    const quint64 requestId = ++m_requestId;
     if (m_apiKey.isEmpty() || m_apiSecret.isEmpty()) {
         emit translationError("有道 AppKey 或 AppSecret 未配置");
         return;
@@ -43,8 +54,8 @@ void YoudaoProvider::translate(const QString &text, const QString &sourceLang, c
     QUrl url("https://openapi.youdao.com/api");
     QUrlQuery params;
     params.addQueryItem("q", text);
-    params.addQueryItem("from", sourceLang == "auto" ? "auto" : sourceLang);
-    params.addQueryItem("to", targetLang);
+    params.addQueryItem("from", sourceLang == "auto" ? "auto" : youdaoLanguage(sourceLang));
+    params.addQueryItem("to", youdaoLanguage(targetLang));
     params.addQueryItem("appKey", m_apiKey);
     params.addQueryItem("salt", salt);
     params.addQueryItem("sign", sign);
@@ -56,6 +67,7 @@ void YoudaoProvider::translate(const QString &text, const QString &sourceLang, c
     request.setTransferTimeout(15000); // 15秒超时
 
     QNetworkReply *reply = m_network->post(request, params.toString(QUrl::FullyEncoded).toUtf8());
+    reply->setProperty("requestId", QVariant::fromValue<qulonglong>(requestId));
     connect(reply, &QNetworkReply::finished, this, &YoudaoProvider::onReplyFinished);
 }
 
@@ -63,6 +75,11 @@ void YoudaoProvider::onReplyFinished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     if (!reply) return;
+    const bool current = reply->property("requestId").toULongLong() == m_requestId;
+    if (!current) {
+        reply->deleteLater();
+        return;
+    }
 
     if (reply->error() != QNetworkReply::NoError) {
         emit translationError(QString("有道错误: %1").arg(reply->errorString()));

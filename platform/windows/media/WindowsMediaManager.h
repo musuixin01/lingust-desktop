@@ -1,27 +1,44 @@
 #pragma once
 
+#include <QObject>
+#include <QByteArray>
 #include <QString>
-#include <functional>
 
-// Windows GSMTC (Global System Media Transport Controls) Platform Adapter
-// Wraps Windows.Media.Control WinRT API for media session state and playback controls
-class WindowsMediaManager
+class QProcess;
+
+class WindowsMediaManager : public QObject
 {
+    Q_OBJECT
+
 public:
-    static WindowsMediaManager& instance();
+    explicit WindowsMediaManager(QObject *parent = nullptr);
+    ~WindowsMediaManager() override;
 
     bool isSupported() const;
-    bool tryConnect();
+    void start();
 
+public slots:
     void sendPlay();
     void sendPause();
     void sendToggle();
     void sendNext();
     void sendPrevious();
+    void sendSeek(int seconds);
+
+signals:
+    void snapshotChanged(bool connected, bool playing,
+                         const QString &title, const QString &artist,
+                         const QString &album, const QString &coverDataUrl,
+                         int durationSeconds,
+                         int positionSeconds);
 
 private:
-    WindowsMediaManager() = default;
-    ~WindowsMediaManager() = default;
+    QString bridgePath() const;
+    void launchAction(const QString &action, int positionSeconds = 0);
+    void processOutput();
+    void scheduleRestart();
 
-    bool m_connected = false;
+    QProcess *m_watcher = nullptr;
+    QByteArray m_stdoutBuffer;
+    bool m_stopping = false;
 };
